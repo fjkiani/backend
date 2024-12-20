@@ -1,13 +1,25 @@
 // src/services/storage/supabase/supabaseStorage.js
 import { createClient } from '@supabase/supabase-js';
 import logger from '../../../logger.js';
-class SupabaseStorage {
-    constructor() {
-      this.supabase = createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_KEY
-      );
+
+export class SupabaseStorage {
+  constructor() {
+    // Debug Supabase config (safely)
+    console.log('Supabase config:', {
+      hasUrl: !!process.env.VITE_SUPABASE_URL,
+      hasKey: !!process.env.VITE_SUPABASE_KEY,
+      keyType: process.env.VITE_SUPABASE_KEY?.includes('service_role') ? 'service_role' : 'anon'
+    });
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error(`Missing Supabase config: URL=${!!supabaseUrl}, Key=${!!supabaseKey}`);
     }
+
+    this.supabase = createClient(supabaseUrl, supabaseKey);
+  }
 
   ensureDate(dateInput) {
     if (dateInput instanceof Date) {
@@ -68,32 +80,18 @@ class SupabaseStorage {
         insertion_source: source
       }));
 
-      console.log('Attempting Supabase upsert...');
-      
       const { data, error } = await this.supabase
         .from('articles')
         .upsert(articlesData, {
           onConflict: 'url',
-          ignoreDuplicates: false,
-          count: 'exact'
+          ignoreDuplicates: true
         })
-        .select('*');
+        .select();
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-
-      console.log('Supabase response:', {
-        success: !error,
-        inserted: data?.length || 0,
-        firstId: data?.[0]?.id,
-        firstTitle: data?.[0]?.title
-      });
-
-      return data;
+      if (error) throw error;
+      return data || [];
     } catch (error) {
-      console.error('Storage failed:', error);
+      logger.error('Failed to store articles:', error);
       throw error;
     }
   }
@@ -203,4 +201,4 @@ class SupabaseStorage {
       throw error;
     }
   }
-}export { SupabaseStorage };
+}

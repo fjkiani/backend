@@ -2,37 +2,32 @@ import axios from 'axios';
 import logger from './logger.js';
 import Redis from 'ioredis';
 import path from 'path';
-// import { config } from 'dotenv';
+import { config } from 'dotenv';
 import * as cheerio from 'cheerio';
 import { fileURLToPath } from 'url';
-// import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// // Load both .env files
-// dotenv.config({ path: path.resolve(__dirname, '../../.env') });  // For Redis
-// dotenv.config({ path: path.resolve(__dirname, '../../../../../.env.local') });  // For Supabase
+config({ path: path.resolve(__dirname, '../../.env') });
 
-let redisClient = null;
+// Debug Redis URL (safely)
+console.log('Redis config:', {
+  hasUrl: !!process.env.REDIS_URL,
+  urlStart: process.env.REDIS_URL?.substring(0, 20) + '...'
+});
 
-function getRedisClient() {
-  if (!redisClient) {
-    redisClient = new Redis(process.env.REDIS_URL || 'redis://shining-starfish-52184.upstash.io:52184', {
-      password: process.env.REDIS_PASSWORD,
-      tls: { rejectUnauthorized: false }
-    });
-  }
-  return redisClient;
-}
+const redisClient = new Redis(process.env.REDIS_URL, {
+  tls: { rejectUnauthorized: false }, // Required for Upstash
+  maxRetriesPerRequest: 3
+});
 
-// Debug: Print environment variables (safely)
-console.log('Environment check:', {
-  hasRedisUrl: !!process.env.REDIS_URL,
-  hasRedisPassword: !!process.env.REDIS_PASSWORD,
-  hasSupabaseUrl: !!process.env.VITE_SUPABASE_URL,
-  hasSupabaseKey: !!process.env.VITE_SUPABASE_KEY,
-  keyType: process.env.VITE_SUPABASE_KEY?.includes('service_role') ? 'service_role' : 'anon'
+redisClient.on('error', (err) => {
+  console.error('Redis error:', err.message);
+});
+
+redisClient.on('connect', () => {
+  console.log('Redis connected successfully');
 });
 
 export async function cleanup() {
