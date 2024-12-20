@@ -2,17 +2,17 @@ import axios from 'axios';
 import logger from './logger.js';
 import Redis from 'ioredis';
 import path from 'path';
-import { config } from 'dotenv';
+// import { config } from 'dotenv';
 import * as cheerio from 'cheerio';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
+// import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load both .env files
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });  // For Redis
-dotenv.config({ path: path.resolve(__dirname, '../../../../../.env.local') });  // For Supabase
+// // Load both .env files
+// dotenv.config({ path: path.resolve(__dirname, '../../.env') });  // For Redis
+// dotenv.config({ path: path.resolve(__dirname, '../../../../../.env.local') });  // For Supabase
 
 let redisClient = null;
 
