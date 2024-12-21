@@ -2,14 +2,11 @@ import axios from 'axios';
 import logger from './logger.js';
 import Redis from 'ioredis';
 import path from 'path';
-import { config } from 'dotenv';
 import * as cheerio from 'cheerio';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-config({ path: path.resolve(__dirname, '../../.env') });
 
 // Debug Redis URL (safely)
 console.log('Redis config:', {
@@ -26,9 +23,15 @@ redisClient.on('error', (err) => {
   console.error('Redis error:', err.message);
 });
 
-redisClient.on('connect', () => {
-  console.log('Redis connected successfully');
-});
+function getRedisClient() {
+  if (!redisClient) {
+    redisClient = new Redis(process.env.REDIS_URL || {
+      host: 'localhost',
+      port: 6379
+    });
+  }
+  return redisClient;
+}
 
 export async function cleanup() {
   try {
@@ -145,11 +148,11 @@ const articles = await scrapeNews(true);  // Force fresh scrape
 
 // Test caching explicitly
 try {
-  await redis.set(cacheKey, JSON.stringify(articles));
+  await redisClient.set(cacheKey, JSON.stringify(articles));
   console.log('Cache set successfully');
   
   // Verify it was saved
-  const cached = await redis.get(cacheKey);
+  const cached = await redisClient.get(cacheKey);
   console.log('Cached data:', cached ? 'Found' : 'Not found');
 } catch (error) {
   console.error('Redis operation failed:', error);

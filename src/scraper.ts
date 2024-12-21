@@ -2,9 +2,9 @@ import axios from 'axios';
 import logger from './logger';
 import { CacheService } from './services/cache/CacheService';
 import { DIFFBOT_FIELDS } from './config/diffbot';
-import dotenv from 'dotenv';
+// import dotenv from 'dotenv';
 
-dotenv.config();
+// dotenv.config();
 
 // Initialize cache service
 const cacheService = new CacheService({
