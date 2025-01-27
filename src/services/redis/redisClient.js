@@ -9,10 +9,17 @@ const redisConfig = process.env.REDIS_URL ? {
   retryStrategy(times) {
     const delay = Math.min(times * 50, 2000);
     return delay;
+  },
+  reconnectOnError: function(err) {
+    const targetError = 'READONLY';
+    if (err.message.includes(targetError)) {
+      return true;
+    }
+    return false;
   }
 } : {
-  host: 'localhost',
-  port: 6379,
+  host: process.env.REDIS_HOST || 'localhost',
+  port: process.env.REDIS_PORT || 6379,
   maxRetriesPerRequest: 3,
   retryStrategy(times) {
     const delay = Math.min(times * 50, 2000);
@@ -25,7 +32,7 @@ let redisClient = null;
 export function getRedisClient() {
   if (!redisClient) {
     logger.info('Initializing Redis client with config:', {
-      url: redisConfig.url || 'localhost:6379',
+      url: process.env.REDIS_URL ? 'Using REDIS_URL (Upstash)' : 'localhost:6379',
       usingTLS: !!redisConfig.tls
     });
     
@@ -35,12 +42,21 @@ export function getRedisClient() {
       logger.error('Redis error:', {
         message: err.message,
         code: err.code,
-        command: err.command
+        command: err.command,
+        stack: err.stack
       });
     });
 
     redisClient.on('connect', () => {
       logger.info('Redis connected successfully');
+    });
+
+    redisClient.on('reconnecting', () => {
+      logger.info('Redis reconnecting...');
+    });
+
+    redisClient.on('ready', () => {
+      logger.info('Redis client is ready');
     });
   }
   return redisClient;
