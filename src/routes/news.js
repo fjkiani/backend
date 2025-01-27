@@ -7,10 +7,22 @@ let storage = null;
 export function initializeRoutes(storageInstance) {
   storage = storageInstance;
 
+  // Add root endpoint
+  router.get('/', async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 100;
+      const { articles } = await storage.getRecentArticles(limit);
+      res.json(articles);
+    } catch (error) {
+      logger.error('Failed to fetch recent articles:', error);
+      res.status(500).json({ error: 'Failed to fetch recent articles' });
+    }
+  });
+
   router.get('/recent', async (req, res) => {
     try {
       const limit = parseInt(req.query.limit) || 100;
-      const articles = await storage.getRecentArticles(limit);
+      const { articles } = await storage.getRecentArticles(limit);
       res.json(articles);
     } catch (error) {
       logger.error('Failed to fetch recent articles:', error);
