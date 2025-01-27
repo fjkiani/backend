@@ -60,6 +60,19 @@ const app = express();
 const scheduler = new NewsScheduler();
 const investing11Service = new Investing11Service();
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {
+      redis: !!process.env.REDIS_URL,
+      supabase: !!process.env.VITE_SUPABASE_URL,
+      diffbot: !!process.env.VITE_DIFFBOT_TOKEN
+    }
+  });
+});
+
 // Initialize SupabaseStorage first
 let storage;
 try {
