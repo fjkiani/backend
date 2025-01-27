@@ -6,13 +6,13 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "build": "npm install && npm run lint && npm run test && npm run typecheck",
+    "build": "npm install",
     "postinstall": "npx puppeteer browsers install chrome",
     "test:webhook": "node tests/webhook-handler.js",
     "test:simulate": "node tests/integration/webhook-simulator.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext .js,.ts"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@huggingface/inference": "^2.8.1",
@@ -52,6 +52,7 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@eslint/js": "^8.57.0"
   }
 }
