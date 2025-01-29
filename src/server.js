@@ -55,6 +55,7 @@ import { SupabaseStorage } from './services/storage/supabase/supabaseStorage.js'
 import investing11Routes from './routes/investing11Routes.js';
 import { Investing11Service } from './services/investing11Service.js';
 import diffbotRoutes from './routes/diffbotRoutes.js';
+import { getRedisClient } from './services/redis/redisClient.js';
 
 const app = express();
 const scheduler = new NewsScheduler();
@@ -123,77 +124,60 @@ app.use('/api/investing11', investing11Routes);
 // Add Diffbot routes
 app.use('/api/diffbot', diffbotRoutes);
 
-// News scraping endpoint with improved timeout handling
+// News scraping endpoint with Vercel-friendly timeout handling
 app.get('/api/scrape/trading-economics', async (req, res) => {
-  const abortController = new AbortController();
-  const timeoutId = setTimeout(() => {
-    abortController.abort();
-  }, 110000); // Set to 110 seconds to allow for cleanup
-
   try {
-    logger.info('Starting news scraping...', {
-      forceFresh: req.query.fresh === 'true',
-      timestamp: new Date().toISOString()
-    });
-
     const forceFresh = req.query.fresh === 'true';
     
-    // Pass abort signal to scrapeNews
-    const articles = await Promise.race([
-      scrapeNews(forceFresh, abortController.signal),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Scraping timeout')), 110000)
-      )
-    ]);
-
-    clearTimeout(timeoutId);
+    // Always try to get cached data first
+    const redis = getRedisClient();
+    const cachedData = await redis.get('trading-economics-news');
     
-    if (!articles || articles.length === 0) {
-      logger.warn('No articles found');
-      return res.json([]);
+    if (cachedData) {
+      const articles = JSON.parse(cachedData);
+      logger.info('Returning cached articles', { count: articles.length });
+      
+      // If fresh data was requested, trigger background refresh
+      if (forceFresh) {
+        // Trigger background refresh without waiting
+        scrapeNews(true).catch(error => {
+          logger.error('Background refresh failed:', error);
+        });
+        
+        res.setHeader('X-Background-Refresh', 'triggered');
+      }
+      
+      return res.json(articles);
     }
     
-    logger.info('Scraped articles:', {
-      count: articles.length,
-      newest: articles[0]?.created_at,
-      oldest: articles[articles.length - 1]?.created_at
+    // If no cache and not forcing fresh, do a quick scrape
+    if (!forceFresh) {
+      const articles = await Promise.race([
+        scrapeNews(false),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Quick scrape timeout')), 8000))
+      ]);
+      
+      return res.json(articles || []);
+    }
+    
+    // If forcing fresh and no cache, return empty and trigger background job
+    scrapeNews(true).catch(error => {
+      logger.error('Background refresh failed:', error);
     });
-
-    // Store articles with timeout handling
-    const storePromises = articles.map(article => 
-      Promise.race([
-        storage.storeArticle(article),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Storage timeout')), 5000)
-        )
-      ]).catch(error => {
-        logger.error('Failed to store article:', {
-          error: error.message,
-          article: {
-            title: article.title,
-            url: article.url
-          }
-        });
-        return null;
-      })
-    );
-
-    await Promise.all(storePromises);
     
-    res.json(articles);
+    res.setHeader('X-Background-Refresh', 'triggered');
+    res.json([]);
+    
   } catch (error) {
-    clearTimeout(timeoutId);
-    
     logger.error('Scraping error:', {
       message: error.message,
-      name: error.name,
-      isAbort: error.name === 'AbortError'
+      name: error.name
     });
     
-    if (error.name === 'AbortError' || error.message === 'Scraping timeout') {
+    if (error.message === 'Quick scrape timeout') {
       res.status(504).json({ 
         error: 'Gateway Timeout',
-        message: 'The scraping operation took too long to complete. Try using fresh=false to get cached data.'
+        message: 'The scraping operation took too long. Please try again with fresh=false to get cached data.'
       });
     } else {
       res.status(500).json({ 
