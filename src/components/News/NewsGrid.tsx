@@ -62,7 +62,7 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
     setLogs([]); // Clear previous logs
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 290000); // 290 seconds timeout
+      const timeoutId = setTimeout(() => controller.abort(), 290000);
 
       setLogs(prev => [...prev, {
         level: 'info',
@@ -70,13 +70,14 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
         timestamp: new Date().toISOString()
       }]);
 
+      console.log('Making request to:', `${BACKEND_URL}/api/scrape/trading-economics?fresh=true`);
+
       const response = await fetch(`${BACKEND_URL}/api/scrape/trading-economics?fresh=true`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Origin': window.location.origin
+          'Content-Type': 'application/json'
         },
-        credentials: 'include',
         signal: controller.signal
       });
       
@@ -110,7 +111,7 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
       if (error.name === 'AbortError') {
         errorMessage = 'The request took too long to complete. The scraping process will continue in the background. Please check back in a few minutes.';
       } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        errorMessage = 'Backend server is not accessible. Please try again later.';
+        errorMessage = `Backend server is not accessible at ${BACKEND_URL}. Please check the connection.`;
       } else if (error.message.includes('504')) {
         errorMessage = 'The request timed out. The scraping process will continue in the background. Please check back in a few minutes.';
       } else {

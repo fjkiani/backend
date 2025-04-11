@@ -2,7 +2,7 @@ import axios from 'axios';
 import logger from '../logger.js';
 import { supabase } from '../supabase/client.js';
 
-const REAL_TIME_NEWS_API_KEY = 'YOUR_REAL_TIME_NEWS_API_KEY'; // <-- IMPORTANT: Replace with your actual key
+const REAL_TIME_NEWS_API_KEY = 'cdee5e97c8msh34c3fd1e0516cb2p13b5bdjsn85e981b0d4a5'; // <-- IMPORTANT: Replace with your actual key
 const REAL_TIME_NEWS_API_HOST = 'real-time-news-data.p.rapidapi.com';
 const NEW_SOURCE_NAME = 'RealTimeNews'; // Define the new source name
 const RATE_LIMIT_DELAY = 1500; // 1.5 seconds between requests
@@ -196,14 +196,14 @@ export class RealTimeNewsService {
 
       // Ensure the data structure matches Supabase schema
       const articlesToStore = articles.map(article => ({
-        id: article.id,
+        // Omit 'id' - let Supabase generate it if it's an auto-incrementing PK
+        // id: article.id, 
         title: article.title,
         content: article.content,
         url: article.url,
         published_at: article.published_at, // Already in ISO format
         source: article.source,
         category: article.category,
-        sentiment: article.sentiment, // Include sentiment if available/needed
         created_at: article.created_at,
         updated_at: article.updated_at
       }));
@@ -211,8 +211,9 @@ export class RealTimeNewsService {
       const { data, error } = await supabase
         .from('articles')
         .upsert(articlesToStore, {
-            onConflict: 'url', // Use URL as conflict target for uniqueness
-            ignoreDuplicates: true // Avoid duplicate entries based on URL
+            // Remove onConflict as 'url' column likely doesn't have a UNIQUE constraint
+            // onConflict: 'url', 
+            ignoreDuplicates: true // Keep this to potentially ignore PK conflicts (though unlikely)
           }
         );
 

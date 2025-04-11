@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { NewsGrid } from '../News/NewsGrid';
 import { SentimentOverview } from '../Analysis/SentimentOverview';
 import { MarketRelationshipGraph } from '../Analysis/MarketRelationshipGraph';
@@ -7,12 +7,22 @@ import { useNewsScraper } from '../../hooks/useNewsScraper';
 import { useNewsProcessor } from '../../hooks/useNewsProcessor';
 import { Newspaper, AlertCircle } from 'lucide-react';
 import { ErrorBoundary } from './ErrorBoundary';
-import { Investing11News } from '../News/Investing11News';
+import { RealTimeNews } from '../News/RealTimeNews';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { RawNewsArticle } from '../../types';
+import { RawNewsArticle as ServiceRawNewsArticle } from '../../services/news/types';
 
 export const NewsDashboard: React.FC = () => {
   const { news, loading: newsLoading, error: newsError } = useNewsScraper();
-  const { processedArticles, loading: processingLoading, error: processingError } = useNewsProcessor(news);
+
+  const newsForProcessor: ServiceRawNewsArticle[] = useMemo(() => {
+    return news.map(article => ({
+      ...article,
+      tags: article.tags?.map(tagString => ({ label: tagString, score: 0 })) ?? undefined,
+    }));
+  }, [news]);
+
+  const { processedArticles, loading: processingLoading, error: processingError } = useNewsProcessor(newsForProcessor);
 
   const isLoading = newsLoading || processingLoading;
   const error = newsError || processingError;
@@ -64,7 +74,7 @@ export const NewsDashboard: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="investing11">
-              <Investing11News />
+              <RealTimeNews />
             </TabsContent>
           </Tabs>
         </main>
