@@ -10,6 +10,16 @@ const __dirname = dirname(__filename);
 // Load environment variables from .env file
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
+// --- Dotenv Debug --- 
+// console.log('[Dotenv Debug] Attempting to read REAL_TIME_NEWS_API_KEY.');
+// console.log(`[Dotenv Debug] Value found: ${process.env.REAL_TIME_NEWS_API_KEY}`);
+// if (!process.env.REAL_TIME_NEWS_API_KEY) {
+//   console.error('[Dotenv Debug] REAL_TIME_NEWS_API_KEY is UNDEFINED or EMPTY after dotenv.config()');
+// } else {
+//   console.log('[Dotenv Debug] REAL_TIME_NEWS_API_KEY seems loaded correctly.');
+// }
+// --- End Dotenv Debug ---
+
 // Manually set environment variables
 process.env.VITE_SUPABASE_URL = 'https://gpirjathvfoqjurjhdxq.supabase.co';
 process.env.VITE_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwaXJqYXRodmZvcWp1cmpoZHhxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNDU3MTExMywiZXhwIjoyMDUwMTQ3MTEzfQ.M3ST5Hjqe8lOvwYdrnAQdS8YGHUB9zsOTOy-izK0bt0';
@@ -23,24 +33,24 @@ process.env.SERVICE_KEY = process.env.VITE_SUPABASE_KEY;
 process.env.DIFFBOT_TOKEN = process.env.VITE_DIFFBOT_TOKEN;
 
 // Debug environment loading
-console.log('Environment loaded:', {
-  envKeys: Object.keys(process.env).filter(key => 
-    key.includes('SUPABASE') || 
-    key.includes('DB_') || 
-    key.includes('SERVICE_') ||
-    key.includes('REDIS') ||
-    key.includes('VITE_') ||
-    key.includes('COHERE')
-  ),
-  supabase: {
-    hasUrl: !!process.env.VITE_SUPABASE_URL,
-    hasKey: !!process.env.VITE_SUPABASE_KEY,
-    urlStart: process.env.VITE_SUPABASE_URL?.substring(0, 20) + '...',
-  },
-  cohere: {
-    hasKey: !!process.env.COHERE_API_KEY
-  }
-});
+// console.log('Environment loaded:', {
+//   envKeys: Object.keys(process.env).filter(key => 
+//     key.includes('SUPABASE') || 
+//     key.includes('DB_') || 
+//     key.includes('SERVICE_') ||
+//     key.includes('REDIS') ||
+//     key.includes('VITE_') ||
+//     key.includes('COHERE')
+//   ),
+//   supabase: {
+//     hasUrl: !!process.env.VITE_SUPABASE_URL,
+//     hasKey: !!process.env.VITE_SUPABASE_KEY,
+//     urlStart: process.env.VITE_SUPABASE_URL?.substring(0, 20) + '...',
+//   },
+//   cohere: {
+//     hasKey: !!process.env.COHERE_API_KEY
+//   }
+// });
 
 // Now import the rest of the modules
 import express from 'express';
@@ -53,12 +63,11 @@ import analysisRoutes from './routes/analysis.js';
 import axios from 'axios';
 import { SupabaseStorage } from './services/storage/supabase/supabaseStorage.js';
 import realTimeNewsRoutes from './routes/realTimeNewsRoutes.js';
-import { RealTimeNewsService } from './services/RealTimeNewsService.js';
 import diffbotRoutes from './routes/diffbotRoutes.js';
+import calendarRoutes from './routes/calendarRoutes.js';
 
 const app = express();
 const scheduler = new NewsScheduler();
-const realTimeNewsService = new RealTimeNewsService();
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -109,6 +118,9 @@ app.use('/api/real-time-news', realTimeNewsRoutes);
 
 // Add Diffbot routes
 app.use('/api/diffbot', diffbotRoutes);
+
+// Add Calendar routes
+app.use('/api/calendar', calendarRoutes);
 
 // News scraping endpoint
 app.get('/api/scrape/trading-economics', async (req, res) => {
@@ -199,5 +211,6 @@ app.get('/api/test-diffbot', async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
+  // Keep this one for confirmation the server started
   console.log(`Server running on port ${PORT}`);
 });

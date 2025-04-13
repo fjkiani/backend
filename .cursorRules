@@ -78,31 +78,97 @@ For options data, use RapidAPI directly instead of the YahooFinanceConnector cla
 When processing options data from RapidAPI, create a mapping of strikes to straddles for easier lookup and processing of call and put data
 When implementing the display_analysis function in Streamlit, ensure it combines all necessary display components (market overview, ticker analysis, technical insights, learning points) to avoid NameError exceptions
 Scratchpad
-Current Task: Implement Market Overview from Multiple News Articles
+
+--- Task: Implement Market Overview from Multiple News Articles ---
+
+Status: Complete (Initial Implementation)
 
 Overview
-Integrate a new feature that analyzes a batch of ~20 news articles (fetched from `real-time-news-data.p.rapidapi.com`) to provide a market overview, moving beyond the current single-article analysis triggered by a button.
+Integrate a new feature that analyzes a batch of ~20 news articles to provide a market overview, moving beyond the current single-article analysis triggered by a button.
 
-Plan (Hybrid Approach)
-[ ] 1. Modify backend API fetching:
-    [ ] Locate current news fetching logic (likely in `backend/src/routes/news.js` or related services).
-    [ ] Replace `investing11.p.rapidapi.com` with `real-time-news-data.p.rapidapi.com`.
-    [ ] Ensure the new API response format (date, title, href) is handled correctly.
-[ ] 2. Implement Batch Title Analysis:
-    [ ] Create a new backend endpoint or modify an existing one (e.g., in `backend/src/routes/analysis.js`) to receive the list of 20 article titles/metadata.
-    [ ] Use an LLM (potentially via `src/services/analysis/openai.ts` or a backend equivalent) to generate a high-level summary and identify key themes/important articles based *only* on the titles.
-[ ] 3. Implement Selective Deep Dive:
-    [ ] Based on the LLM output from step 2, select a small subset (3-5) of articles.
-    [ ] Trigger the existing single-article analysis flow for these selected articles. This likely involves:
-        [ ] Fetching full article content using existing scraper logic (e.g., `backend/src/services/diffbot/` or related scrapers).
-        [ ] Calling the existing LLM analysis function (potentially reusing logic related to `src/hooks/useNewsAnalysis.ts` or its backend counterpart).
-[ ] 4. Combine and Display Results:
-    [ ] Structure the final output to include both the high-level summary and the detailed insights from the selected articles.
-    [ ] Update frontend components (e.g., `src/components/Dashboard/`, `src/components/News/`) to display this new market overview.
+--- RealTimeNews Source (Completed) ---
+[X] 1. Modify backend API fetching (Handled by NewsProviderFactory/RealTimeNewsAdapter)
+[X] 2. Create Backend Endpoint (`/api/analysis/market-overview`)
+[X] 3. Implement Title Triage (CohereService.triageArticleTitles)
+[X] 4. Implement Selective Content Fetching (DiffbotService)
+[X] 5. Implement Selective Summarization (CohereService.analyzeArticle)
+[X] 6. Implement Synthesis (CohereService.synthesizeOverview)
+[X] 7. Integrate into Frontend (`RealTimeNews.tsx`)
 
---- Previous Task ---
-Task: Creating Business Landing Page for Document Processing Solution
-Overview
-Transform the document processing application into a profitable SaaS business targeting financial institutions.
-Landing Page Components Plan
-[X] Define target audience: Banking & Financial institutions [ ] Create compelling value proposition [ ] Design page structure [ ] Plan content strategy [ ] Define pricing model
+--- TradingEconomics Source (Completed) ---
+[X] 1. Verify/Modify Backend Fetching:
+    [X] Ensure `scrapeNews` fetches ~20 articles with existing summaries.
+    [X] Map fetched data includes summary in `content` field.
+[X] 2. Create New Backend Endpoint (`/api/analysis/trading-economics-overview`):
+    [X] Implement new POST route in `analysis.js`.
+    [X] Step 1: Reuse `CohereService.triageArticleTitles`.
+    [X] Step 2 (Modified): Extract existing summaries from input `articles` for key URLs.
+    [X] Step 3 (Skipped): No summarization needed.
+    [X] Step 4: Reuse `CohereService.synthesizeOverview` with extracted summaries.
+    [X] Step 5: Return synthesized overview.
+[X] 3. Integrate into Frontend (`NewsDashboard.tsx` / relevant TE component):
+    [X] Add state for overview/loading.
+    [X] Trigger call to *new* `/api/analysis/trading-economics-overview` endpoint.
+    [X] Display overview.
+
+--- Task: Refine TE Overview Synthesis using Gemini ---
+[ ] 1. Install Node.js SDK: `npm install @google/generative-ai` in backend directory.
+[ ] 2. Add API Key: Ensure `GEMINI_API_KEY` is in `backend/.env`.
+[ ] 3. Create Service: Create `backend/src/services/analysis/googleGenaiService.js`.
+[ ] 4. Implement Service:
+    [ ] Add class `GoogleGenaiService` with constructor initializing SDK client.
+    [ ] Add `synthesizeOverview` method using `gemini-1.5-flash-latest` (or similar).
+    [ ] Adapt synthesis prompt for Gemini, requesting detailed analysis.
+    [ ] Handle API calls and responses.
+[ ] 5. Integrate:
+    [ ] Import and instantiate `GoogleGenaiService` in `analysis.js`.
+    [ ] Replace `cohereService.synthesizeOverview` call with `googleGenaiService.synthesizeOverview` in `/trading-economics-overview` endpoint.
+[ ] 6. Test: Verify the output quality of the TE overview.
+
+--- Task: Integrate Economic Calendar --- 
+[X] 1. Define API & Data: Identified RapidAPI endpoint and data structure.
+[X] 2. Backend Implementation:
+    [X] Add API keys to `.env` (Use existing RapidAPI key).
+    [X] Create `EconomicCalendarService.js`.
+    [X] Implement event fetching logic in service.
+    [X] Create `/api/calendar/events` endpoint in `calendarRoutes.js`.
+    [X] Register router in `server.js`.
+[ ] 3. Frontend Implementation:
+    [ ] Create `EconomicCalendar.tsx` component.
+    [ ] Add data fetching logic (hook/useEffect) to fetch weekly events.
+    [ ] Implement filtering/display logic for "Today's Upcoming", "Today's Past", and "This Week".
+    [ ] Integrate component into `NewsDashboard.tsx` UI.
+[ ] 4. LLM Integration (See New Task Below)
+[ ] 5. Testing: Test backend, frontend display.
+
+--- Task: Add LLM Interpretation for Calendar ---
+[X] 1. Event-Level Interpretation:
+    [X] Backend: Create `POST /api/calendar/interpret-event` endpoint.
+    [X] Backend: Implement LLM call in endpoint to explain single event significance.
+    [X] Frontend: Add UI element in `EconomicCalendar.tsx` to trigger interpretation.
+    [X] Frontend: Display LLM explanation (tooltip/modal).
+[ ] 2. Contextual Interpretation (News + Calendar):
+    [X] Backend: Modify analysis routes (`/interpret-event`) to accept `marketOverview`. (Implemented in interpret-event)
+    [X] Backend: Update LLM prompt (`googleGenaiService`) to accept `marketOverview`. (Implemented in interpret-event prompt)
+    [X] Backend: Update prompt instructions to require interpreting event *in context* of market overview. (Implemented in interpret-event prompt)
+    [X] Frontend: Pass `marketOverview` from `NewsDashboard` to `EconomicCalendar`.
+    [X] Frontend: Use `marketOverview` prop in `handleInterpretEvent` call.
+    [ ] Backend: Modify synthesis routes (`/market-overview`, `/trading-economics-overview`) to also fetch relevant calendar events. (Deferred/Optional)
+    [ ] Backend: Update synthesis prompts (`CohereService`, `GoogleGenaiService`) to accept calendar events. (Deferred/Optional)
+    [ ] Backend: Update synthesis prompt instructions to require synthesizing news *in context* of calendar events. (Deferred/Optional)
+[ ] 3. Testing: Test interpretation endpoints and contextual synthesis outputs.
+
+--- Task: Integrate Earnings Calendar (FMP API / Mboum History) ---
+[X] 1. Backend: Add `FMP_API_KEY` to `.env`.
+[X] 2. Backend: Add `MBOUM_RAPIDAPI_KEY` to `.env` (Use key: 9f107deaabmsh2efbc3559ddca05p17f1abjsn271e6df32f7c).
+[X] 3. Backend: Ensure `EarningsCalendarService.js` uses FMP API (`/stable/earnings-calendar`) for *range* fetching.
+[X] 4. Backend: Ensure `fetchHistoricalEarnings(symbol)` method uses Mboum *`earnings`* module.
+[ ] 5. Backend: Add `fetchEarningsTrendData(symbol)` method to use Mboum *`earnings-trend`* module.
+[X] 6. Backend: Ensure LLM prompt logic exists (in `googleGenaiService.analyzeEarningsTrend`).
+[X] 7. Backend: Ensure `GET /api/calendar/earnings` only fetches calendar range data.
+[X] 8. Backend: Ensure `POST /api/calendar/earnings/analyze` route exists for on-demand analysis.
+[ ] 9. Backend: Modify `POST /api/calendar/earnings/analyze` route to fetch *both* history and trend data.
+[ ] 10. Backend: Update `googleGenaiService.buildEarningsTrendPrompt` to incorporate *both* history and trend data.
+[X] 11. Frontend: Ensure `EarningsCalendar.tsx` uses on-demand state and calls POST route.
+[ ] 12. Docs: Update `hybrid.md`.
+[ ] 13. Testing: Test backend/frontend enhanced on-demand analysis flow.
