@@ -62,6 +62,14 @@ export class EconomicCalendarService {
         try {
             const response = await axios(options);
 
+            // ---> ADD LOGGING HERE <---
+            logger.debug('EconomicCalendarService: Received response from RapidAPI', {
+                status: response.status,
+                headers: response.headers,
+                // Log only the start of the data to avoid huge logs
+                dataSnippet: JSON.stringify(response.data)?.substring(0, 200) + '...'
+            });
+
             // Validate response structure - Check for the 'result' key containing the array
             if (!response.data || !Array.isArray(response.data.result)) { 
                 logger.error('EconomicCalendarService: Unexpected API response structure. Expected object with result array.', {

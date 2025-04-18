@@ -193,6 +193,12 @@ router.get('/earnings', async (req, res) => {
         });
 
     } catch (error) { 
+        // ---> ADD LOGGING HERE <---
+        logger.error(`Error in GET /api/calendar/earnings route BEFORE sending response:`, { 
+            errorMessage: error.message, 
+            errorStack: error.stack,
+            requestQuery: req.query 
+        });
         logger.error(`Error in FMP earnings calendar route processing:`, { message: error.message, stack: error.stack });
         res.status(500).json({ 
             error: 'Failed to process earnings calendar data',

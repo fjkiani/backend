@@ -409,6 +409,13 @@ router.post('/trading-economics-overview', async (req, res) => {
 
     // === Step 4: Synthesize Market Overview (LLM Call - using Gemini) ===
     logger.info('Synthesizing final TE market overview with collected summaries using Gemini.');
+    logger.debug('Data passed to Gemini synthesis:', {
+        themesProvided: !!initialThemes,
+        themeSnippet: initialThemes?.substring(0,100) + '...',
+        summariesCount: Object.keys(summariesToSynthesize).length,
+        // Log a sample summary if available
+        sampleSummary: Object.values(summariesToSynthesize)[0]?.substring(0, 100) + '...' || 'N/A'
+    });
     // Call the Google service for synthesis
     const finalOverview = await googleGenaiService.synthesizeOverview(initialThemes, summariesToSynthesize);
     logger.info('Final TE overview synthesis completed using Gemini.');

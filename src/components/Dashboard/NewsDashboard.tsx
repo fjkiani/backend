@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { NewsGrid } from '../News/NewsGrid';
 import { SentimentOverview } from '../Analysis/SentimentOverview';
 import { MarketRelationshipGraph } from '../Analysis/MarketRelationshipGraph';
@@ -24,10 +24,13 @@ export const NewsDashboard: React.FC = () => {
   const [teMarketOverview, setTeMarketOverview] = useState<string | null>(null);
   const [isTeOverviewLoading, setIsTeOverviewLoading] = useState(false);
   const [teOverviewError, setTeOverviewError] = useState<string | null>(null);
+  // --- Ref to track if overview was fetched for the current news set ---
+  const overviewFetchedForNewsRef = useRef<RawNewsArticle[] | null>(null);
   // --- End State ---
 
   // --- Fetch Function for TE Market Overview ---
   const fetchTeMarketOverview = async (articlesToAnalyze: RawNewsArticle[]) => {
+    console.log('[fetchTeMarketOverview] STARTING fetch.'); // Log start
     if (articlesToAnalyze.length === 0) {
       setTeMarketOverview(null);
       return;
@@ -35,7 +38,8 @@ export const NewsDashboard: React.FC = () => {
     
     setIsTeOverviewLoading(true);
     setTeOverviewError(null);
-    setTeMarketOverview(null);
+    // setTeMarketOverview(null); // --- Temporarily COMMENT OUT immediate clearing ---
+    console.log('[fetchTeMarketOverview] State set to loading.');
     
     try {
       console.log('Requesting TE market overview for', articlesToAnalyze.length, 'articles');
@@ -60,32 +64,47 @@ export const NewsDashboard: React.FC = () => {
       }
 
       const data = await response.json();
-      console.log('TE Market overview response received:', data);
+      console.log('[fetchTeMarketOverview] Fetch successful. Response data:', data);
       
       if (data.error) {
         throw new Error(data.error);
       }
       
-      setTeMarketOverview(data.overview || 'TE Overview generation returned empty.');
+      setTeMarketOverview(data.overview || 'TE Overview generation returned empty (from backend).'); // Set overview on success
+      console.log('[fetchTeMarketOverview] State set with overview:', data.overview?.substring(0,50) + '...'); // Log setting state
       console.log('TE Market overview debug info:', data.debug);
       
     } catch (error: unknown) {
+      console.error("[fetchTeMarketOverview] Fetch error:", error); // Log error
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during TE overview generation';
       setTeOverviewError(errorMessage);
-      console.error("TE Market overview fetch error:", error);
+      setTeMarketOverview(null); // <-- Clear overview ONLY on error -->
+      console.log('[fetchTeMarketOverview] State cleared due to error.');
     } finally {
       setIsTeOverviewLoading(false);
+      console.log('[fetchTeMarketOverview] FINISHED fetch (finally block).'); // Log finish
     }
   };
   // --- End Fetch Function ---
   
   // --- Trigger TE Overview Fetch --- 
   useEffect(() => {
-    // Fetch overview only when news is loaded, not loading, and there are articles
-    if (!newsLoading && newsError === null && news.length > 0) {
-      fetchTeMarketOverview(news); 
+    console.log('[useEffect TE Overview] Running effect. Conditions:', {
+      newsLoading,
+      newsError: newsError === null,
+      newsLength: news.length > 0,
+      // Check if news object reference has changed AND we haven't fetched for it
+      needsFetch: news !== overviewFetchedForNewsRef.current
+    });
+    // Fetch overview only when news is loaded, not loading, no error, 
+    // there are articles, AND we haven't fetched for this specific news array instance yet.
+    if (!newsLoading && newsError === null && news.length > 0 && news !== overviewFetchedForNewsRef.current) {
+      console.log('[useEffect TE Overview] Conditions MET. Calling fetchTeMarketOverview.');
+      fetchTeMarketOverview(news);
+      // Mark that we have fetched for this news array instance
+      overviewFetchedForNewsRef.current = news;
     }
-  }, [news, newsLoading, newsError]); // Depend on news data and loading/error status
+  }, [news, newsLoading, newsError]); // Keep dependencies, but add check inside
   // --- End Trigger ---
 
   const newsForProcessor: ServiceRawNewsArticle[] = useMemo(() => {

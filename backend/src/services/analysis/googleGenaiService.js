@@ -2,10 +2,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import logger from '../../logger.js';
 
 // --- Constants ---
-// Using Flash as it's generally faster and cheaper for tasks like synthesis
-// Consider gemini-1.5-pro-latest if higher quality is needed and latency/cost allows
-const GEMINI_MODEL_NAME = "gemini-1.5-flash-latest"; 
-const MAX_OUTPUT_TOKENS = 1024; // Adjust as needed for overview length
+// Switch to Pro model for deeper analysis tasks
+// const GEMINI_MODEL_NAME = "gemini-1.5-pro-latest"; 
+// const GEMINI_MODEL_NAME = "gemini-2.0-flash-thinking-exp-01-21"; 
+const GEMINI_MODEL_NAME = "gemini-1.5-flash-latest"; // Use standard Flash model
+const MAX_OUTPUT_TOKENS = 1024; // Keep this for now, adjust if needed for Pro
 const TEMPERATURE = 0.4; // Similar to Cohere setting
 const TOP_P = 1;
 const TOP_K = 1;
@@ -59,10 +60,12 @@ export class GoogleGenaiService {
         // Using generateContent for non-streaming
         const result = await this.model.generateContent(prompt);
         const response = result.response;
-        const synthesis = response.text();
+        const rawText = response.text();
+        logger.debug('Raw response text from Gemini:', { rawText });
+        const synthesis = rawText.trim();
         
         logger.info('Google Gemini market overview synthesis successful.');
-        return synthesis.trim();
+        return synthesis;
 
     } catch (error) {
       // Log concise error info
@@ -199,14 +202,19 @@ Market Overview:`;
     return `You are a concise financial analyst providing an earnings preview for ${symbol} based ONLY on the provided data.
 
 Context:
-1. ${historyContext}
-2. ${upcomingContext}
-3. ${trendContext}
+Historical Data:
+${historyContext}
 
-Task: Provide a brief analysis (3-4 sentences) covering these points:
-- What is the pattern of earnings surprises (beats/misses) in the recent historical quarters provided?
-- How have analyst estimates for the upcoming quarter changed recently, and how many revisions have occurred?
-- Synthesize these historical patterns and recent estimate trends to provide a brief outlook context for the upcoming earnings release. Avoid speculation or external data.
+Upcoming Estimate:
+${upcomingContext}
+
+Estimate Trend:
+${trendContext}
+
+Task: Provide a brief analysis (3-4 sentences) covering these points. Ground your analysis in the specific data provided in the context sections above:
+- What is the pattern of earnings surprises (beats/misses) based on the Historical Data provided?
+- How have analyst estimates for the upcoming quarter changed recently (referencing Estimate Trend data)?
+- Synthesize the historical patterns and recent estimate trends to provide a brief outlook context for the Upcoming Estimate. Avoid speculation or external data.
 
 Analysis:`;
   }

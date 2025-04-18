@@ -79,6 +79,21 @@ When processing options data from RapidAPI, create a mapping of strikes to strad
 When implementing the display_analysis function in Streamlit, ensure it combines all necessary display components (market overview, ticker analysis, technical insights, learning points) to avoid NameError exceptions
 Scratchpad
 
+--- Completed Features Summary (High-Level) ---
+*   **News Integration:** Fetched and displayed news from RealTimeNews and Trading Economics sources.
+*   **Market Overview Generation:**
+    *   Implemented multi-step analysis (triage, fetch, summarize, synthesize) for RealTimeNews using Cohere & Diffbot.
+    *   Implemented overview generation for Trading Economics using Cohere (triage) and Gemini (synthesis), utilizing pre-fetched summaries.
+*   **Economic Calendar:**
+    *   Integrated RapidAPI for fetching economic events.
+    *   Implemented date range filtering and display.
+    *   Added contextual LLM (Gemini) interpretation for individual events, considering the market overview.
+*   **Earnings Calendar:**
+    *   Integrated FMP API for fetching calendar range data.
+    *   Integrated Mboum API for historical earnings and estimate trend data.
+    *   Implemented on-demand LLM (Gemini) analysis of earnings trends for specific tickers, incorporating historical performance and estimate revisions.
+*   **Refactoring:** Introduced news provider adapters (`NewsProviderFactory`, `RealTimeNewsAdapter`) and standardized internal article structure (`InternalArticle`).
+
 --- Task: Implement Market Overview from Multiple News Articles ---
 
 Status: Complete (Initial Implementation)
@@ -95,7 +110,7 @@ Integrate a new feature that analyzes a batch of ~20 news articles to provide a 
 [X] 6. Implement Synthesis (CohereService.synthesizeOverview)
 [X] 7. Integrate into Frontend (`RealTimeNews.tsx`)
 
---- TradingEconomics Source (Completed) ---
+--- Economics Source (Completed) ---
 [X] 1. Verify/Modify Backend Fetching:
     [X] Ensure `scrapeNews` fetches ~20 articles with existing summaries.
     [X] Map fetched data includes summary in `content` field.
@@ -104,7 +119,7 @@ Integrate a new feature that analyzes a batch of ~20 news articles to provide a 
     [X] Step 1: Reuse `CohereService.triageArticleTitles`.
     [X] Step 2 (Modified): Extract existing summaries from input `articles` for key URLs.
     [X] Step 3 (Skipped): No summarization needed.
-    [X] Step 4: Reuse `CohereService.synthesizeOverview` with extracted summaries.
+    [X] Step 4: Reuse `CohereService.synthesizeOverview` with extracted summaries. (Now uses Gemini)
     [X] Step 5: Return synthesized overview.
 [X] 3. Integrate into Frontend (`NewsDashboard.tsx` / relevant TE component):
     [X] Add state for overview/loading.
@@ -112,18 +127,19 @@ Integrate a new feature that analyzes a batch of ~20 news articles to provide a 
     [X] Display overview.
 
 --- Task: Refine TE Overview Synthesis using Gemini ---
-[ ] 1. Install Node.js SDK: `npm install @google/generative-ai` in backend directory.
-[ ] 2. Add API Key: Ensure `GEMINI_API_KEY` is in `backend/.env`.
-[ ] 3. Create Service: Create `backend/src/services/analysis/googleGenaiService.js`.
-[ ] 4. Implement Service:
-    [ ] Add class `GoogleGenaiService` with constructor initializing SDK client.
-    [ ] Add `synthesizeOverview` method using `gemini-1.5-flash-latest` (or similar).
-    [ ] Adapt synthesis prompt for Gemini, requesting detailed analysis.
-    [ ] Handle API calls and responses.
-[ ] 5. Integrate:
-    [ ] Import and instantiate `GoogleGenaiService` in `analysis.js`.
-    [ ] Replace `cohereService.synthesizeOverview` call with `googleGenaiService.synthesizeOverview` in `/trading-economics-overview` endpoint.
-[ ] 6. Test: Verify the output quality of the TE overview.
+Status: Needs Debugging
+[X] 1. Install Node.js SDK: `npm install @google/generative-ai` in backend directory.
+[X] 2. Add API Key: Ensure `GEMINI_API_KEY` is in `backend/.env`.
+[X] 3. Create Service: Create `backend/src/services/analysis/googleGenaiService.js`.
+[X] 4. Implement Service:
+    [X] Add class `GoogleGenaiService` with constructor initializing SDK client.
+    [X] Add `synthesizeOverview` method using `gemini-2.0-flash-thinking-exp-01-21`.
+    [X] Adapt synthesis prompt for Gemini, requesting detailed analysis.
+    [X] Handle API calls and responses.
+[X] 5. Integrate:
+    [X] Import and instantiate `GoogleGenaiService` in `analysis.js`.
+    [X] Replace `cohereService.synthesizeOverview` call with `googleGenaiService.synthesizeOverview` in `/trading-economics-overview` endpoint.
+[ ] 6. Test: Verify the output quality of the TE overview. (Currently returning empty - needs debugging logs)
 
 --- Task: Integrate Economic Calendar --- 
 [X] 1. Define API & Data: Identified RapidAPI endpoint and data structure.
@@ -133,13 +149,13 @@ Integrate a new feature that analyzes a batch of ~20 news articles to provide a 
     [X] Implement event fetching logic in service.
     [X] Create `/api/calendar/events` endpoint in `calendarRoutes.js`.
     [X] Register router in `server.js`.
-[ ] 3. Frontend Implementation:
-    [ ] Create `EconomicCalendar.tsx` component.
-    [ ] Add data fetching logic (hook/useEffect) to fetch weekly events.
-    [ ] Implement filtering/display logic for "Today's Upcoming", "Today's Past", and "This Week".
-    [ ] Integrate component into `NewsDashboard.tsx` UI.
-[ ] 4. LLM Integration (See New Task Below)
-[ ] 5. Testing: Test backend, frontend display.
+[X] 3. Frontend Implementation:
+    [X] Create `EconomicCalendar.tsx` component.
+    [X] Add data fetching logic (hook/useEffect) to fetch weekly events.
+    [X] Implement filtering/display logic for "Today's Upcoming", "Today's Past", and "This Week".
+    [X] Integrate component into `NewsDashboard.tsx` UI.
+[X] 4. LLM Integration (See New Task Below)
+[X] 5. Testing: Test backend, frontend display.
 
 --- Task: Add LLM Interpretation for Calendar ---
 [X] 1. Event-Level Interpretation:
@@ -147,7 +163,7 @@ Integrate a new feature that analyzes a batch of ~20 news articles to provide a 
     [X] Backend: Implement LLM call in endpoint to explain single event significance.
     [X] Frontend: Add UI element in `EconomicCalendar.tsx` to trigger interpretation.
     [X] Frontend: Display LLM explanation (tooltip/modal).
-[ ] 2. Contextual Interpretation (News + Calendar):
+[X] 2. Contextual Interpretation (News + Calendar):
     [X] Backend: Modify analysis routes (`/interpret-event`) to accept `marketOverview`. (Implemented in interpret-event)
     [X] Backend: Update LLM prompt (`googleGenaiService`) to accept `marketOverview`. (Implemented in interpret-event prompt)
     [X] Backend: Update prompt instructions to require interpreting event *in context* of market overview. (Implemented in interpret-event prompt)
@@ -156,19 +172,45 @@ Integrate a new feature that analyzes a batch of ~20 news articles to provide a 
     [ ] Backend: Modify synthesis routes (`/market-overview`, `/trading-economics-overview`) to also fetch relevant calendar events. (Deferred/Optional)
     [ ] Backend: Update synthesis prompts (`CohereService`, `GoogleGenaiService`) to accept calendar events. (Deferred/Optional)
     [ ] Backend: Update synthesis prompt instructions to require synthesizing news *in context* of calendar events. (Deferred/Optional)
-[ ] 3. Testing: Test interpretation endpoints and contextual synthesis outputs.
+[X] 3. Testing: Test interpretation endpoints and contextual synthesis outputs.
 
 --- Task: Integrate Earnings Calendar (FMP API / Mboum History) ---
 [X] 1. Backend: Add `FMP_API_KEY` to `.env`.
 [X] 2. Backend: Add `MBOUM_RAPIDAPI_KEY` to `.env` (Use key: 9f107deaabmsh2efbc3559ddca05p17f1abjsn271e6df32f7c).
 [X] 3. Backend: Ensure `EarningsCalendarService.js` uses FMP API (`/stable/earnings-calendar`) for *range* fetching.
 [X] 4. Backend: Ensure `fetchHistoricalEarnings(symbol)` method uses Mboum *`earnings`* module.
-[ ] 5. Backend: Add `fetchEarningsTrendData(symbol)` method to use Mboum *`earnings-trend`* module.
+[X] 5. Backend: Add `fetchEarningsTrendData(symbol)` method to use Mboum *`earnings-trend`* module.
 [X] 6. Backend: Ensure LLM prompt logic exists (in `googleGenaiService.analyzeEarningsTrend`).
 [X] 7. Backend: Ensure `GET /api/calendar/earnings` only fetches calendar range data.
 [X] 8. Backend: Ensure `POST /api/calendar/earnings/analyze` route exists for on-demand analysis.
-[ ] 9. Backend: Modify `POST /api/calendar/earnings/analyze` route to fetch *both* history and trend data.
-[ ] 10. Backend: Update `googleGenaiService.buildEarningsTrendPrompt` to incorporate *both* history and trend data.
+[X] 9. Backend: Modify `POST /api/calendar/earnings/analyze` route to fetch *both* history and trend data.
+[X] 10. Backend: Update `googleGenaiService.buildEarningsTrendPrompt` to incorporate *both* history and trend data.
 [X] 11. Frontend: Ensure `EarningsCalendar.tsx` uses on-demand state and calls POST route.
 [ ] 12. Docs: Update `hybrid.md`.
-[ ] 13. Testing: Test backend/frontend enhanced on-demand analysis flow.
+[X] 13. Testing: Test backend/frontend enhanced on-demand analysis flow.
+
+--- Brainstorming & Future Improvements ---
+
+*   **Data Quality & Consistency:**
+    *   [ ] **TE Overview Debug:** Resolve the empty overview issue. Ensure `scrapeNews` provides reliable summaries or adjust the gathering logic.
+    *   [ ] **API Error Handling:** Implement more robust error handling for external APIs (Diffbot, Cohere, Gemini, FMP, Mboum, RapidAPI), potentially with retries or user notifications.
+    *   [ ] **Data Standardization:** Ensure consistent date formats, numeric types, etc., across all fetched data before storage or processing.
+*   **LLM Usage & Prompting:**
+    *   [ ] **Synthesis Prompts:** Review and refine prompts for both Cohere and Gemini synthesis (market overview, earnings trend) for clarity, accuracy, and consistency.
+    *   [ ] **LLM Error Handling:** Add specific checks for empty or error responses from LLM APIs and provide fallback messages. Implement fallback models if experimental ones fail.
+    *   [ ] **Model Exploration:** Experiment with different LLM models (e.g., other Gemini versions, Cohere models) or parameters (temperature) for specific tasks.
+*   **Filtering & Relevance:**
+    *   [ ] **Earnings Filtering:** Re-evaluate filtering options for the FMP earnings calendar (e.g., based on presence of estimates, market cap if fetchable via another API).
+    *   [ ] **User Filters:** Allow users to customize importance filters or other display options for calendars.
+    *   [ ] **Relevance Sorting:** Improve how news or events are prioritized or sorted based on potential market impact.
+*   **UI/UX:**
+    *   [ ] **Loading/Error States:** Provide more granular loading indicators (e.g., "Fetching content...", "Summarizing...", "Synthesizing..."). Improve error message presentation.
+    *   [ ] **Analysis Display:** Show confidence scores or source information for LLM-generated analysis. Make interpretation areas more visually distinct.
+    *   [ ] **Settings:** Add a user settings panel (e.g., API keys if applicable, default filters).
+*   **Backend/Architecture:**
+    *   [ ] **Dependency Injection:** Refactor services (`Cohere`, `Gemini`, `Calendar`, etc.) to use dependency injection for better testability.
+    *   [ ] **Caching:** Review Redis caching strategies (durations, keys, invalidation) for effectiveness.
+    *   [ ] **Task Queuing:** Consider using a task queue (e.g., BullMQ) for longer-running analysis processes (like multi-step market overview) to avoid blocking API responses.
+*   **Documentation:**
+    *   [X] **hybrid.md:** Update with details on FMP/Mboum integration for earnings.
+    *   [ ] Add documentation for API endpoints and data structures.
