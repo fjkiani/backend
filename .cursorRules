@@ -189,6 +189,70 @@ Status: Needs Debugging
 [ ] 12. Docs: Update `hybrid.md`.
 [X] 13. Testing: Test backend/frontend enhanced on-demand analysis flow.
 
+--- Task: Implement Persistent Overall Market Context Engine ---
+
+**Goal:** Create a system that generates, stores, and evolves a daily market context summary, incorporating previous context, latest news overviews, and upcoming catalysts, while also providing actionable takeaways.
+
+**Approach:** Hybrid Approach v2 (Periodic Job (Manual Trigger for now), Supabase Context Storage, Redis Input Cache, Single LLM Synthesis Call)
+
+**Implementation Plan:**
+
+**Phase 1: Backend Setup & Logic (Completed)**
+
+*   `[X]` **1. Scheduler Setup:** (Manual Trigger via POST Endpoint implemented)
+    *   `[-]` a. *(Deferred: Install `node-cron`)*
+    *   `[-]` b. *(Deferred: Create `contextScheduler.js`)*
+    *   `[-]` c. *(Deferred: Configure cron job)*
+*   `[X]` **2. Supabase Schema:**
+    *   `[X]` a. Defined and created `market_context` table.
+    *   `[X]` b. Columns: `id`, `generated_at`, `context_text`.
+*   `[X]` **3. Market Context Service (`marketContextService.js`):**
+    *   `[X]` a. Created `backend/src/services/analysis/marketContextService.js`.
+    *   `[X]` b. Implemented `MarketContextService` class.
+    *   `[X]` c. Implemented `generateAndStoreContext()`:
+        *   `[X]` i. Fetch Previous Context (Supabase).
+        *   `[X]` ii. Fetch Latest News Overviews (Redis).
+        *   `[X]` iii. Fetch Upcoming Economic Catalysts.
+        *   `[X]` iv. Fetch Upcoming Earnings Catalysts.
+        *   `[X]` v. Build LLM Prompt.
+        *   `[X]` vi. Call LLM (Gemini).
+        *   `[X]` vii. Store Result (Supabase).
+*   `[X]` **4. Integration & Caching:**
+    *   `[X]` a. Instantiated `MarketContextService`.
+    *   `[X]` b. Created Manual Trigger Endpoint: `POST /api/context/generate-now`.
+    *   `[X]` c. Modified overview endpoints (`analysis.js`) to cache results in Redis.
+
+**Phase 2: Frontend API & Display (Completed)**
+
+*   `[X]` **5. Backend API Endpoint (Read):**
+    *   `[X]` a. Created `backend/src/routes/contextRoutes.js`.
+    *   `[X]` b. Defined `GET /api/context/latest` endpoint.
+    *   `[X]` c. Implemented handler to read from Supabase.
+    *   `[X]` d. Registered router in `server.js`.
+*   `[X]` **6. Frontend Hook:**
+    *   `[X]` a. Created `src/hooks/useMarketContext.ts`.
+    *   `[X]` b. Implemented hook to fetch from `/api/context/latest`.
+*   `[X]` **7. Frontend Display Component:**
+    *   `[X]` a. Created `src/components/Context/MarketContextDisplay.tsx`.
+    *   `[X]` b. Component displays context string, handles loading/error.
+*   `[X]` **8. Integrate into Dashboard:**
+    *   `[X]` a. Called `useMarketContext` hook in `NewsDashboard.tsx` (implicitly via Display component).
+    *   `[X]` b. Added `<MarketContextDisplay />` component to dashboard.
+    *   `[X]` c. Added Manual Trigger Button with refetch logic.
+
+**Phase 3: Enhancing Existing Features (Completed)**
+
+*   `[X]` **9. Contextualize Interpretations/Analyses:**
+    *   `[X]` a. Fetched context in `EconomicCalendar.tsx` & `EarningsCalendar.tsx` using hook.
+    *   `[X]` b. Modified backend analysis endpoints (`/interpret-event`, `/earnings/analyze`) to accept `overallContext`.
+    *   `[X]` c. Modified LLM service methods/prompts (`googleGenaiService`) to use the `overallContext`.
+
+**Phase 4: Documentation & Refinement**
+
+*   `[ ]` **10. Update Docs:** Update `.cursorrules`, `progress.md`, `hybrid.md` etc.
+*   `[ ]` **11. Testing & Prompt Tuning:** Test generation, refine prompts.
+*   `[ ]` **12. Implement Scheduler:** Replace manual trigger with `node-cron` job.
+
 --- Brainstorming & Future Improvements ---
 
 *   **Data Quality & Consistency:**
@@ -214,3 +278,84 @@ Status: Needs Debugging
 *   **Documentation:**
     *   [X] **hybrid.md:** Update with details on FMP/Mboum integration for earnings.
     *   [ ] Add documentation for API endpoints and data structures.
+
+--- Task: Implement Configurable Source Monitor & Diffbot Analyzer ---
+
+**Goal:** Develop a reusable Python script that monitors specified web pages for new articles and analyzes them using Diffbot.
+
+**Phase 1: Basic ForexLive Monitor & Diffbot Integration**
+
+*   `[ ]` **1. Create Script:** Create a new Python script, e.g., `backend/src/scripts/monitor_source.py`.
+*   `[ ]` **2. Add Dependencies:** Ensure necessary Python libraries are installed in the `./venv` environment (`requests`, `beautifulsoup4`, `redis`, `python-dotenv`). *Action: Need to run pip install if not present.*
+*   `[ ]` **3. Configuration:**
+    *   Define initial configuration *within the script* for ForexLive:
+        *   `SOURCE_NAME = "ForexLiveCentralBanks"`
+        *   `SOURCE_URL = "https://www.forexlive.com/CentralBanks"`
+        *   `ARTICLE_LINK_SELECTOR = "..."` (CSS selector to find article `<a>` tags on the page - *needs inspection of ForexLive HTML*)
+        *   `REDIS_PROCESSED_KEY = f"processed_urls:{SOURCE_NAME}"`
+*   `[ ]` **4. Fetch & Parse Logic:**
+    *   Implement a function `fetch_and_extract_articles(url, selector)`:
+        *   Use `requests` to get page HTML. Handle errors.
+        *   Use `BeautifulSoup` to parse HTML.
+        *   Find all elements matching `ARTICLE_LINK_SELECTOR`.
+        *   Extract the absolute URL (`href`) from each element.
+        *   Return a `set` of current article URLs found on the page.
+*   `[ ]` **5. State Management (Redis):**
+    *   Implement functions to interact with Redis:
+        *   `connect_redis()`: Connect using `REDIS_URL` from `.env`.
+        *   `get_processed_urls(redis_client, key)`: Use `SMEMBERS` to get the set of processed URLs.
+        *   `add_processed_url(redis_client, key, url)`: Use `SADD` to add a URL to the set.
+*   `[ ]` **6. Diffbot Call Logic:**
+    *   Implement `analyze_with_diffbot(article_url)`:
+        *   Get `DIFFBOT_TOKEN` from `.env`.
+        *   Construct the Diffbot `/v3/analyze` API URL.
+        *   Make the `requests.get` call to Diffbot. Handle errors.
+        *   Return the parsed JSON result from Diffbot.
+*   `[ ]` **7. Main Loop Logic:**
+    *   Connect to Redis.
+    *   Load `processed_urls` for the source.
+    *   Fetch `current_urls` for the source.
+    *   Identify `new_urls = current_urls - processed_urls`.
+    *   For each `url` in `new_urls`:
+        *   Call `analyze_with_diffbot(url)`.
+        *   If successful:
+            *   Print/Log the Diffbot result (e.g., as JSON).
+            *   Call `add_processed_url()` to mark it as done.
+*   `[ ]` **8. Testing:** Run the script manually (`./venv/bin/python backend/src/scripts/monitor_source.py`) and verify it fetches, detects new articles (on subsequent runs), calls Diffbot, and updates Redis.
+
+**Phase 2: Configuration & Replicability**
+
+*   `[ ]` **9. External Configuration:**
+    *   Move source configurations (URL, selector, Redis key prefix) out of the script into a separate file (e.g., `config/monitored_sources.json` or a Python dict).
+    *   Example structure:
+        ```json
+        {
+          "ForexLiveCentralBanks": {
+            "url": "https://www.forexlive.com/CentralBanks",
+            "selector": "article h3 a", // Example selector - needs verification
+            "fetch_method": "requests" // Could add 'selenium' later if needed
+          },
+          "AnotherSource": { ... }
+        }
+        ```
+*   `[ ]` **10. Script Argument:** Modify the script to accept a `source_name` as a command-line argument.
+*   `[ ]` **11. Dynamic Loading:** Load the configuration for the specified `source_name` at the start of the script. Use the loaded config values (URL, selector, Redis key) throughout the script.
+
+**Phase 3: Integration & Scheduling**
+
+*   `[ ]` **12. Define Data Destination:** Decide *where* the structured data from Diffbot should go. Options:
+    *   **Option A (Simple):** Just log the JSON output from the script.
+    *   **Option B (Supabase):** Add logic (maybe using `supabase-py` if installed, or preferably calling a dedicated Node.js backend endpoint) to insert relevant fields from the Diffbot result into the `articles` table or a new table.
+    *   **Option C (Redis):** Store the results temporarily in Redis if another service will consume them quickly.
+*   `[ ]` **13. Implement Data Storage:** Implement the chosen storage mechanism from step 12 within the script's main loop after a successful Diffbot analysis.
+*   `[ ]` **14. Scheduling:** Set up a system scheduler (like `cron` on Linux/macOS or Task Scheduler on Windows) to run the `monitor_source.py` script periodically for each configured source.
+    *   Example `cron` entry (runs every 15 mins for ForexLive):
+        `*/15 * * * * cd /path/to/project && /path/to/project/venv/bin/python backend/src/scripts/monitor_source.py ForexLiveCentralBanks >> /path/to/logfile.log 2>&1`
+
+**Phase 4: Error Handling & Refinements**
+
+*   `[ ]` **15. Robust Errors:** Add more specific error handling for network timeouts, HTTP errors (from source and Diffbot), parsing errors, Redis connection issues.
+*   `[ ]` **16. Rate Limiting:** Be mindful of potential rate limits on Diffbot and the target websites. Add delays if necessary.
+*   `[ ]` **17. Logging:** Improve logging for better monitoring (use Python's `logging` module).
+
+--- Brainstorming & Future Improvements ---

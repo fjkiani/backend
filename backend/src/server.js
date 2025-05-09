@@ -65,6 +65,7 @@ import { SupabaseStorage } from './services/storage/supabase/supabaseStorage.js'
 import realTimeNewsRoutes from './routes/realTimeNewsRoutes.js';
 import diffbotRoutes from './routes/diffbotRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
+import contextRoutes from './routes/contextRoutes.js';
 
 const app = express();
 const scheduler = new NewsScheduler();
@@ -121,6 +122,9 @@ app.use('/api/diffbot', diffbotRoutes);
 
 // Add Calendar routes
 app.use('/api/calendar', calendarRoutes);
+
+// Add Context routes
+app.use('/api/context', contextRoutes);
 
 // News scraping endpoint
 app.get('/api/scrape/trading-economics', async (req, res) => {

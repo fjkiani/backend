@@ -330,6 +330,18 @@ router.post('/market-overview', async (req, res) => {
 
     // === Step 5: Return Combined Results ===
     // Include detailedSummaries in debug for now
+    if (finalOverview && typeof finalOverview === 'string' && finalOverview.trim() !== '' && !finalOverview.startsWith('Error')) {
+      try {
+        const redisKey = 'overview:realtime-news'; // Defined in MarketContextService
+        const ttl = 3600; // 1 hour
+        await redis.set(redisKey, finalOverview, 'EX', ttl);
+        logger.info('Successfully cached RealTimeNews overview', { key: redisKey });
+      } catch (cacheError) {
+        logger.error('Failed to cache RealTimeNews overview', { error: cacheError.message });
+        // Do not fail the request if caching fails
+      }
+    }
+    
     res.json({
       overview: finalOverview, // Use the generated overview
       processedArticles: articles, // Placeholder - potentially return updated articles with summaries/content later
@@ -422,6 +434,18 @@ router.post('/trading-economics-overview', async (req, res) => {
     // === End Step 4 ===
 
     // === Step 5: Return Combined Results ===
+    if (finalOverview && typeof finalOverview === 'string' && finalOverview.trim() !== '' && !finalOverview.startsWith('Error')) {
+      try {
+        const redisKey = 'overview:trading-economics'; // Defined in MarketContextService
+        const ttl = 3600; // 1 hour
+        await redis.set(redisKey, finalOverview, 'EX', ttl);
+        logger.info('Successfully cached Trading Economics overview', { key: redisKey });
+      } catch (cacheError) {
+        logger.error('Failed to cache Trading Economics overview', { error: cacheError.message });
+        // Do not fail the request if caching fails
+      }
+    }
+    
     res.json({
       overview: finalOverview, 
       debug: {

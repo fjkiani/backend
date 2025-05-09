@@ -116,9 +116,9 @@ Generate the overview as a single block of text.
 Market Overview:`;
   }
 
-  // --- Method for Earnings Trend Analysis (Now accepts trendData) ---
-  async analyzeEarningsTrend(symbol, upcomingEvent, historicalData, trendData) {
-    logger.info(`Analyzing earnings trend for ${symbol} with Google Gemini (using history and trend data).`);
+  // --- Method for Earnings Trend Analysis (Now accepts trendData and overallContext) ---
+  async analyzeEarningsTrend(symbol, upcomingEvent, historicalData, trendData, overallContext) {
+    logger.info(`Analyzing earnings trend for ${symbol} with Google Gemini (using history, trend, and overall context).`);
 
     // Extract latest historical result
     const latestHistory = historicalData?.[0]; 
@@ -139,8 +139,14 @@ Market Overview:`;
          // Proceed without trend if unavailable, but mention it
     }
 
-    // Build prompt using all available data
-    const prompt = this.buildEarningsTrendPrompt(symbol, upcomingEvent, historicalData, currentTrend);
+    // Build prompt using all available data, including overall context
+    const prompt = this.buildEarningsTrendPrompt(
+        symbol, 
+        upcomingEvent, 
+        historicalData, 
+        currentTrend, 
+        overallContext // Pass context to prompt builder
+    );
     logger.debug(`Built Gemini Earnings Trend Prompt for ${symbol}:`, { promptStart: prompt.substring(0, 300) + '...', promptLength: prompt.length });
 
     try {
@@ -161,13 +167,11 @@ Market Overview:`;
     }
   }
 
-  // Prompt builder now accepts and uses multiple historical points and currentTrend data
-  buildEarningsTrendPrompt(symbol, upcomingEvent, historicalData, currentTrend) {
+  // Prompt builder now accepts and uses overallContext
+  buildEarningsTrendPrompt(symbol, upcomingEvent, historicalData, currentTrend, overallContext) {
     // --- Format Historical Data --- 
     let historyContext = 'No recent historical earnings data provided.';
-    // Take last 8 quarters, or fewer if less data available
     const historicalSlice = historicalData?.slice(0, 8) || []; 
-    
     if (historicalSlice.length > 0) {
         historyContext = `Historical Earnings (Last ${historicalSlice.length} Quarters - Newest First):\n`;
         historyContext += historicalSlice.map(q => {
@@ -183,9 +187,14 @@ Market Overview:`;
         }).join('\n');
     }
 
-    // --- Format Upcoming Estimate --- 
-    const upcomingEstimate = upcomingEvent.epsEstimated;
-    const upcomingContext = `Upcoming Earnings Estimate (${upcomingEvent.date}): ${upcomingEstimate.toFixed(2)}`;
+    // --- Format Upcoming/Actual Event Data --- 
+    const isPastEvent = typeof upcomingEvent.epsActual === 'number';
+    let eventContext = '';
+    if (isPastEvent) {
+        eventContext = `Reported Earnings (${upcomingEvent.date}): Actual ${upcomingEvent.epsActual.toFixed(2)}, Estimate ${upcomingEvent.epsEstimated?.toFixed(2) ?? 'N/A'}`;
+    } else {
+        eventContext = `Upcoming Earnings Estimate (${upcomingEvent.date}): ${upcomingEvent.epsEstimated?.toFixed(2) ?? 'N/A'}`;
+    }
 
     // --- Format Estimate Trend Data --- 
     let trendContext = 'No current quarter estimate trend data provided.';
@@ -198,25 +207,47 @@ Market Overview:`;
         trendContext += `  - Revisions Down (last 30d): ${currentTrend.epsRevisions?.downLast30days?.longFmt || '0'}`; 
     }
 
+    // Format Overall Context
+    const overallContextFormatted = overallContext || 'Overall market context was not provided.';
+
+    // --- Define Task based on Past/Upcoming --- 
+    let taskInstruction = '';
+    let analysisTitle = '';
+
+    if (isPastEvent) {
+        taskInstruction = `Task: Provide a brief analysis (3-4 sentences) of the *reported* earnings event for ${symbol}. Ground your analysis *strictly* in the specific data provided for ${symbol} AND the Overall Market Context:
+- How did ${symbol}'s actual EPS compare to the estimate and its historical surprise pattern?
+- How does this reported outcome align or contrast with the Overall Market Context provided? Does it confirm, contradict, or modify the broader market picture described?
+- Briefly note if the estimate trend data (which reflects the *current* quarter) seemed predictive or counter to the reported result, acknowledging this is a retrospective view.`;
+        analysisTitle = `Analysis of ${symbol}'s Reported Earnings:`;
+    } else {
+        taskInstruction = `Task: Provide a brief analysis (3-4 sentences) covering these points. Ground your analysis *strictly* in the specific data provided for ${symbol} AND the Overall Market Context:
+- What is the pattern of ${symbol}'s earnings surprises (beats/misses) based on its Historical Data?
+- How have analyst estimates for ${symbol}'s upcoming quarter changed recently (referencing its Estimate Trend data)?
+- **Synthesize ${symbol}'s historical patterns and recent estimate trends IN THE CONTEXT of the Overall Market Context.** Does the general market mood (from Overall Context) seem aligned or contrasted with ${symbol}'s specific situation? Provide a brief outlook for the upcoming earnings release considering both the company-specific data and the broader market picture.`;
+        analysisTitle = `Analysis for ${symbol}:`;
+    }
+
     // --- Build Final Prompt --- 
-    return `You are a concise financial analyst providing an earnings preview for ${symbol} based ONLY on the provided data.
+    return `You are a concise financial analyst providing an earnings analysis for ${symbol} based ONLY on the provided data.
 
-Context:
-Historical Data:
+Overall Market Context:
+===
+${overallContextFormatted}
+===
+
+Specific ${symbol} Data:
+${isPastEvent ? 'Reported Event' : 'Upcoming Event'}: ${eventContext}
+Historical Earnings:
 ${historyContext}
-
-Upcoming Estimate:
-${upcomingContext}
-
 Estimate Trend:
 ${trendContext}
 
-Task: Provide a brief analysis (3-4 sentences) covering these points. Ground your analysis in the specific data provided in the context sections above:
-- What is the pattern of earnings surprises (beats/misses) based on the Historical Data provided?
-- How have analyst estimates for the upcoming quarter changed recently (referencing Estimate Trend data)?
-- Synthesize the historical patterns and recent estimate trends to provide a brief outlook context for the Upcoming Estimate. Avoid speculation or external data.
+${taskInstruction}
 
-Analysis:`;
+Avoid speculation or external data not present in the provided context sections. Do not give financial advice.
+
+${analysisTitle}`;
   }
   // --- End Method ---
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Loader2, AlertCircle, CalendarDays, Clock, CheckCircle, ArrowRight, Star, Info, MessageSquare } from 'lucide-react';
+import { useMarketContext } from '../../hooks/useMarketContext';
 
 // Point to the local backend server during development
 const BACKEND_URL = 'http://localhost:3001';
@@ -126,11 +127,13 @@ const getThisMonthDates = () => {
 // --- End Date Helpers ---
 
 // Define Props interface
+/*
 interface EconomicCalendarProps {
   marketOverview: string | null; // Accept the overview text or null
 }
+*/
 
-export const EconomicCalendar: React.FC<EconomicCalendarProps> = ({ marketOverview }) => {
+export const EconomicCalendar: React.FC = () => {
     const [allEvents, setAllEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -140,6 +143,9 @@ export const EconomicCalendar: React.FC<EconomicCalendarProps> = ({ marketOvervi
     const [interpretationLoading, setInterpretationLoading] = useState(false);
     const [interpretationError, setInterpretationError] = useState<string | null>(null);
     const [currentInterpretation, setCurrentInterpretation] = useState<{ event: CalendarEvent; text: string } | null>(null);
+
+    // Use the Market Context Hook here
+    const { contextText: overallMarketContext, loading: contextLoading, error: contextError } = useMarketContext();
 
     const dateRangeDetails = useMemo(() => {
         switch (selectedRange) {
@@ -212,6 +218,8 @@ export const EconomicCalendar: React.FC<EconomicCalendarProps> = ({ marketOvervi
         setInterpretationError(null);
         setCurrentInterpretation(null); 
         console.log('[Interpret Request] Requesting for:', event.indicator, event.id);
+        // Get the latest context from the hook state
+        const contextToSend = overallMarketContext || "Overall market context was not available.";
 
         try {
             const response = await fetch(`${BACKEND_URL}/api/calendar/interpret-event`, {
@@ -219,10 +227,10 @@ export const EconomicCalendar: React.FC<EconomicCalendarProps> = ({ marketOvervi
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                // Send the event object AND the received market overview prop
+                // Send the event object AND the fetched overall market context
                 body: JSON.stringify({ 
-                    event, 
-                    marketOverview: marketOverview || "Market context was not provided." // Use prop or default
+                    event,
+                    overallContext: contextToSend // Pass the context here
                 }), 
             });
             console.log('[Interpret Request] Response status:', response.status);
@@ -347,7 +355,7 @@ export const EconomicCalendar: React.FC<EconomicCalendarProps> = ({ marketOvervi
     // --- Main Rendering with Date Range Selector & Importance Filter --- 
     return (
         <div className="p-4 border rounded-lg shadow-sm bg-white">
-            {/* Header Row */}
+            {/* Header Row - Add context loading/error info? Optional */}
             <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
                  <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
                     <CalendarDays className="w-5 h-5 text-blue-600" />
@@ -393,6 +401,9 @@ export const EconomicCalendar: React.FC<EconomicCalendarProps> = ({ marketOvervi
                     </div>
                  </div>
             </div>
+            {/* Display context loading/error state if desired - Example */}
+            {/* {contextLoading && <p className="text-xs text-gray-400 italic mb-2">Loading overall context...</p>} */}
+            {/* {contextError && <p className="text-xs text-red-500 italic mb-2">Error loading context: {contextError}</p>} */}
 
             {/* Loading / Error / No Data States */} 
             {loading && (

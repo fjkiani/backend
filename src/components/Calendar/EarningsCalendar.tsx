@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Loader2, AlertCircle, CalendarDays, Info } from 'lucide-react';
+import { useMarketContext } from '../../hooks/useMarketContext';
 
 // Point to the local backend server during development
 const BACKEND_URL = 'http://localhost:3001';
@@ -88,6 +89,9 @@ export const EarningsCalendar: React.FC = () => {
     const [currentAnalysis, setCurrentAnalysis] = useState<{ symbol: string; text: string } | null>(null);
     // --- End Analysis State ---
 
+    // Use the Market Context Hook here
+    const { contextText: overallMarketContext, loading: contextLoading, error: contextError } = useMarketContext();
+
     const dateRangeDetails = useMemo(() => {
         switch (selectedRange) {
             case 'lastWeek': return getLastWeekDates();
@@ -156,6 +160,8 @@ export const EarningsCalendar: React.FC = () => {
         setAnalysisError(null);
         setCurrentAnalysis(null);
         console.log(`[Analyze] Requesting trend for ${event.symbol}`);
+        // Get latest context from hook
+        const contextToSend = overallMarketContext || "Overall market context was not available.";
 
         try {
             const response = await fetch(`${BACKEND_URL}/api/calendar/earnings/analyze`, {
@@ -163,7 +169,12 @@ export const EarningsCalendar: React.FC = () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ symbol: event.symbol, event: event }), // Send symbol and the event object
+                // Send symbol, event, AND overallContext
+                body: JSON.stringify({ 
+                    symbol: event.symbol, 
+                    event: event, 
+                    overallContext: contextToSend 
+                }), 
             });
             console.log(`[Analyze] Response status for ${event.symbol}:`, response.status);
 
@@ -258,6 +269,10 @@ export const EarningsCalendar: React.FC = () => {
                     </div>
                  </div>
             </div>
+
+            {/* Optional: Display context loading/error */}
+            {/* {contextLoading && <p className="text-xs text-gray-400 italic mb-2">Loading overall context...</p>} */}
+            {/* {contextError && <p className="text-xs text-red-500 italic mb-2">Error loading context: {contextError}</p>} */}
 
             {/* Loading / Error / No Data States */} 
             {loading && (

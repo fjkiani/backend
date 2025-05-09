@@ -5,7 +5,7 @@ import { MarketRelationshipGraph } from '../Analysis/MarketRelationshipGraph';
 import { ServiceStatus } from './ServiceStatus';
 import { useNewsScraper } from '../../hooks/useNewsScraper';
 import { useNewsProcessor } from '../../hooks/useNewsProcessor';
-import { Newspaper, AlertCircle, Loader2 } from 'lucide-react';
+import { Newspaper, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { RealTimeNews } from '../News/RealTimeNews';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
@@ -13,6 +13,8 @@ import { RawNewsArticle } from '../../types';
 import { RawNewsArticle as ServiceRawNewsArticle } from '../../services/news/types';
 import { EconomicCalendar } from '../Calendar/EconomicCalendar';
 import { EarningsCalendar } from '../Calendar/EarningsCalendar';
+import { useMarketContext } from '../../hooks/useMarketContext';
+import { MarketContextDisplay } from '../Context/MarketContextDisplay';
 
 // Assume backend URL is defined or imported
 const BACKEND_URL = 'http://localhost:3001';
@@ -27,6 +29,14 @@ export const NewsDashboard: React.FC = () => {
   // --- Ref to track if overview was fetched for the current news set ---
   const overviewFetchedForNewsRef = useRef<RawNewsArticle[] | null>(null);
   // --- End State ---
+
+  // --- Use Market Context Hook --- 
+  const { refetch: refetchMarketContext } = useMarketContext(); // Get the refetch function
+  // We don't need the contextText/loading state here, MarketContextDisplay handles it
+
+  // --- State for Manual Trigger --- 
+  const [isGeneratingContext, setIsGeneratingContext] = useState(false);
+  const [triggerError, setTriggerError] = useState<string | null>(null);
 
   // --- Fetch Function for TE Market Overview ---
   const fetchTeMarketOverview = async (articlesToAnalyze: RawNewsArticle[]) => {
@@ -119,6 +129,34 @@ export const NewsDashboard: React.FC = () => {
   const isLoading = newsLoading || processingLoading;
   const error = newsError || processingError;
 
+  // --- Handle Manual Context Generation Trigger --- 
+  const handleGenerateContext = async () => {
+    setIsGeneratingContext(true);
+    setTriggerError(null);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/context/generate-now`, {
+        method: 'POST',
+      });
+      if (!response.ok || response.status !== 202) { // Check for 202 Accepted
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Trigger failed: ${response.status} - ${errorData.error || response.statusText}`);
+      }
+      console.log('[NewsDashboard] Context generation trigger successful.');
+      // Wait a short moment before refetching to give backend time to process
+      setTimeout(() => {
+        refetchMarketContext(); 
+        console.log('[NewsDashboard] Refetching market context after trigger.');
+      }, 2000); // 2-second delay (adjust as needed)
+
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown trigger error';
+      setTriggerError(errorMessage);
+      console.error('[NewsDashboard] Error triggering context generation:', err);
+    } finally {
+      setIsGeneratingContext(false);
+    }
+  };
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
@@ -134,9 +172,27 @@ export const NewsDashboard: React.FC = () => {
           </div>
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 py-6">
+        <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+          {/* --- Overall Market Context Display --- */}
+          <MarketContextDisplay />
+
+          {/* --- Manual Trigger Button --- */}
+          <div className="text-right">
+            <button
+              onClick={handleGenerateContext}
+              disabled={isGeneratingContext}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 ${isGeneratingContext ? 'animate-spin' : ''}`} />
+              {isGeneratingContext ? 'Generating Context...' : 'Generate/Update Context'}
+            </button>
+            {triggerError && (
+              <p className="text-xs text-red-600 mt-1">Error: {triggerError}</p>
+            )}
+          </div>
+
           {error ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-500" />
               <div>
                 <p className="text-red-700 font-medium">{error.message}</p>
@@ -149,7 +205,7 @@ export const NewsDashboard: React.FC = () => {
 
           {/* Display Economic Calendar above the tabs/news grid */}
           <div className="mb-6">
-            <EconomicCalendar marketOverview={teMarketOverview} />
+            <EconomicCalendar />
           </div>
 
           {/* Display Earnings Calendar */}

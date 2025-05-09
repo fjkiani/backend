@@ -86,8 +86,9 @@ router.post('/interpret-event', async (req, res) => {
     }
 
     // --- Input Validation --- 
-    const event = req.body.event; // Expecting the full event object
-    const marketOverview = req.body.marketOverview || 'No market overview context provided.'; // Get overview, provide default
+    const event = req.body.event; 
+    // Extract overallContext, provide a default if missing
+    const overallContext = req.body.overallContext || 'Overall market context was not provided.'; 
 
     if (!event || typeof event !== 'object' || !event.indicator || !event.country) {
         logger.warn('Invalid event data received for interpretation', { body: req.body });
@@ -98,14 +99,16 @@ router.post('/interpret-event', async (req, res) => {
     try {
         // --- Build Contextual Prompt --- 
         const isPastEvent = event.actual !== null;
-        let promptContext = `Current Market Overview Context:
----
-${marketOverview}
----
-
-`;
         
-        promptContext += `Event Details:
+        // Start prompt with the overall context
+        let promptContext = `Current Overall Market Context:
+===
+${overallContext}
+===
+
+`; 
+        
+        promptContext += `Specific Event Details:
 Indicator: ${event.indicator} (${event.country})
 Period: ${event.period ?? 'N/A'}
 Unit: ${event.unit ?? 'N/A'}
@@ -117,23 +120,26 @@ Actual: ${event.actual}
 Forecast: ${event.forecast ?? 'N/A'}
 Previous: ${event.previous ?? 'N/A'}
 `;
+            // Refined Task instruction for PAST events
             promptContext += `
-Task: Explain the significance of this actual result compared to the forecast/previous data, specifically for short-term traders, considering the provided market overview context. What impact might this outcome have had on market direction or volatility?`;
+Task: Based *strictly* on the Specific Event Details and the Current Overall Market Context provided above, explain the significance of this *actual* event result compared to the forecast/previous data. **Specifically, relate this outcome to the key themes or sentiment described in the Overall Market Context.** How might this result confirm, contradict, or modify the overall market picture presented?`;
         } else {
             promptContext += `Status: Upcoming
 Forecast: ${event.forecast ?? 'N/A'}
 Previous: ${event.previous ?? 'N/A'}
 `;
+            // Refined Task instruction for UPCOMING events
             promptContext += `
-Task: Explain the potential significance of this upcoming release for short-term traders, considering the provided market overview context. What might happen if the actual result meets, beats, or misses the forecast/previous data, given the current market climate described in the overview? What potential impact on volatility or direction should traders watch for?`;
+Task: Based *strictly* on the Specific Event Details and the Current Overall Market Context provided above, explain the potential significance of this *upcoming* release. **Specifically, relate the potential impact (if met, beat, or missed) to the key themes or sentiment described in the Overall Market Context.** How might different outcomes influence the overall market picture presented?`;
         }
 
+        // Combine context and instructions for the final prompt
         const prompt = `${promptContext}
 
-Keep the explanation concise (2-4 sentences) and focused only on information inferable from the context. Do not give financial advice.`;
+Keep the explanation concise (2-4 sentences) and focused strictly on information inferable from the provided context. Do not introduce external information or give financial advice.`;
 
         // --- Call LLM --- 
-        logger.debug('Sending contextual event interpretation prompt to Gemini', { indicator: event.indicator, isPast: isPastEvent });
+        logger.debug('Sending contextual event interpretation prompt to Gemini', { indicator: event.indicator, isPast: isPastEvent, promptStart: prompt.substring(0, 200) + '...'});
         const result = await googleGenaiService.model.generateContent(prompt);
         const response = result.response;
         const interpretation = response.text().trim();
@@ -209,7 +215,8 @@ router.get('/earnings', async (req, res) => {
 
 // --- NEW Route for On-Demand Earnings Analysis ---
 router.post('/earnings/analyze', async (req, res) => {
-    const { symbol, event } = req.body; // Expect symbol and the specific calendar event object
+    // Extract symbol, event, AND overallContext from body
+    const { symbol, event, overallContext } = req.body; 
     logger.info(`POST /api/calendar/earnings/analyze received for symbol: ${symbol}`);
 
     // --- Validation ---
@@ -217,9 +224,11 @@ router.post('/earnings/analyze', async (req, res) => {
         return res.status(400).json({ error: 'Missing symbol in request body.' });
     }
     if (!event || typeof event !== 'object' || typeof event.epsEstimated === 'undefined') {
-        // Check for epsEstimated existence, even if null, to ensure it's a valid event structure
         return res.status(400).json({ error: 'Missing or invalid event data in request body.' });
     }
+    // Add validation/default for overallContext? Optional, service can handle default.
+    const contextToUse = overallContext || "Overall market context was not provided.";
+    
     if (!earningsCalendarService) {
         logger.error('Earnings calendar service (FMP) is not available for history fetch.');
         return res.status(503).json({ error: 'Data service unavailable' });
@@ -249,8 +258,14 @@ router.post('/earnings/analyze', async (req, res) => {
             });
         }
         
-        // Pass both historical and trend data to the analysis function
-        const analysisText = await googleGenaiService.analyzeEarningsTrend(symbol, event, historicalData, trendData);
+        // Pass overall context to the analysis function
+        const analysisText = await googleGenaiService.analyzeEarningsTrend(
+            symbol, 
+            event, 
+            historicalData, 
+            trendData, 
+            contextToUse // Pass the context
+        );
         logger.info(`LLM analysis completed for ${symbol}`);
 
         // Step 3: Return analysis
