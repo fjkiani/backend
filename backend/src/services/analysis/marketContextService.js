@@ -1,9 +1,12 @@
 import logger from '../../logger.js';
 import { supabase } from '../../supabase/client.js';
-import { redis } from '../../routes/analysis.js'; // Assuming shared Redis client
+import { getRedisClient } from '../../redis/client.js';
 import { EconomicCalendarService } from '../calendar/EconomicCalendarService.js';
-import earningsCalendarService from '../calendar/EarningsCalendarService.js'; // Assuming default export
+import { EarningsCalendarService } from '../calendar/EarningsCalendarService.js';
 import { GoogleGenaiService } from './googleGenaiService.js';
+import { NewsProviderFactory } from '../news/NewsProviderFactory.js';
+import { CohereService } from './cohere.js';
+import { DiffbotService } from '../diffbot/DiffbotService.js';
 import { get } from 'lodash-es';
 
 // --- Constants --- 
@@ -13,209 +16,219 @@ const RECENT_DAYS_FOR_CATALYSTS = 3; // Look ahead ~3 days for upcoming events
 const REDIS_OVERVIEW_TE_KEY = 'overview:trading-economics';
 const REDIS_OVERVIEW_RTNEWS_KEY = 'overview:realtime-news';
 const SUPABASE_CONTEXT_TABLE = 'market_context';
+const MAX_PREVIOUS_CONTEXT_LENGTH = 5000; // Max characters for previous context
+const MAX_NEWS_OVERVIEW_LENGTH = 2000;    // Max characters for each news overview
+const MAX_CATALYSTS_LENGTH = 1500;        // Max characters for each catalyst list
 
 export class MarketContextService {
     constructor() {
-        // Initialize dependent services
-        // Note: Consider dependency injection later for better testability
+        this.redisClient = getRedisClient();
+        this.economicCalendarService = new EconomicCalendarService();
+        this.earningsCalendarService = new EarningsCalendarService();
+        this.googleGenaiService = new GoogleGenaiService();
+
+        // For refreshing overviews - these might already be instantiated elsewhere
+        // Consider dependency injection for a cleaner setup later.
         try {
-            this.economicCalendarService = new EconomicCalendarService();
-            this.earningsCalendarService = earningsCalendarService; // Uses the default export instance
-            this.googleGenaiService = new GoogleGenaiService(); // Assumes API key is set
-            logger.info('MarketContextService initialized with dependencies.');
+            this.newsProviderFactory = new NewsProviderFactory();
+            this.cohereService = new CohereService();
+            this.diffbotService = new DiffbotService();
         } catch (error) {
-            logger.error('Failed to initialize dependencies in MarketContextService', error);
-            // Depending on which service failed, we might want to throw
-            // or handle it gracefully in the generate method.
-            // For now, log and continue, methods might fail later.
+            logger.warn('[MCS] Could not instantiate all services needed for overview refresh:', error.message);
+            this.newsProviderFactory = null;
+            this.cohereService = null;
+            this.diffbotService = null;
+        }
+
+        if (!this.redisClient) {
+            logger.error('[MCS] Redis client is not available. MarketContextService may not function correctly.');
+            throw new Error('Redis client failed to initialize for MarketContextService');
+        }
+        logger.info('[MCS] MarketContextService initialized.');
+    }
+
+    async _generateRealTimeNewsOverview() {
+        if (!this.newsProviderFactory || !this.cohereService || !this.diffbotService) {
+            logger.warn('[MCS] Required services for RealTimeNews overview refresh are not available.');
+            return null;
+        }
+        try {
+            logger.info('[MCS] Attempting to generate fresh RealTimeNews overview...');
+            const adapter = this.newsProviderFactory.getNewsAdapter('realtime-news');
+            const articles = await adapter.searchNews({ query: 'general market news', limit: 20, sources: null, removeDuplicates: true });
+
+            if (!articles || articles.length === 0) {
+                logger.info('[MCS] No articles found from RealTimeNews for overview refresh.');
+                return null;
+            }
+
+            const articleTitlesForTriage = articles.map(a => ({ url: a.url, title: a.title, publishedAt: a.publishedAt }));
+            const keyUrls = await this.cohereService.triageArticleTitles(articleTitlesForTriage);
+            logger.info(`[MCS] RealTimeNews Triage identified ${keyUrls.length} key URLs.`);
+
+            if (!keyUrls || keyUrls.length === 0) return 'No key articles were identified from RealTimeNews.';
+
+            const fetchedKeyArticles = [];
+            for (const url of keyUrls) {
+                const articleContent = await this.diffbotService.analyze(url);
+                if (articleContent && articleContent.text) {
+                    fetchedKeyArticles.push({ ...articleContent, url }); // Add URL back for context
+                } else {
+                    logger.warn(`[MCS] Failed to fetch or extract text for URL via Diffbot: ${url}`);
+                }
+            }
+
+            if (fetchedKeyArticles.length === 0) return 'Content could not be fetched for key RealTimeNews articles.';
+
+            const summaries = [];
+            for (const article of fetchedKeyArticles) {
+                const summary = await this.cohereService.analyzeArticle(article.text, article.title, 'summarize-xlarge');
+                if (summary && summary.summary) {
+                    summaries.push({ title: article.title, summary: summary.summary, url: article.url });
+                } else {
+                    logger.warn(`[MCS] Failed to summarize article: ${article.title}`);
+                }
+            }
+
+            if (summaries.length === 0) return 'No summaries could be generated for key RealTimeNews articles.';
+
+            // For synthesis, we use a simplified theme structure here
+            const themes = [{ name: "General Market Update", articles: summaries.map(s => s.title) }]; 
+            const finalOverview = await this.cohereService.synthesizeOverview(themes, summaries, 'Generate a concise market overview based on these summaries.');
+            
+            logger.info('[MCS] Successfully generated fresh RealTimeNews overview.', { length: finalOverview?.length });
+            return finalOverview;
+
+        } catch (error) {
+            logger.error('[MCS] Error during _generateRealTimeNewsOverview:', error);
+            return null;
         }
     }
 
-    async generateAndStoreContext() {
-        logger.info('Starting generation of overall market context...');
-        let previousContext = PREVIOUS_CONTEXT_DEFAULT;
-        let teOverview = NEWS_OVERVIEW_DEFAULT;
-        let rtNewsOverview = NEWS_OVERVIEW_DEFAULT;
-        let upcomingEconCatalysts = "None identified.";
-        let upcomingEarningsCatalysts = "None identified.";
+    async generateAndStoreContext(forceRefreshOverviews = false) {
+        logger.info(`[MCS] Starting market context generation. Force refresh overviews: ${forceRefreshOverviews}`);
+        let teOverview = null;
+        let rtNewsOverview = null;
 
-        try {
-            // --- Step 1: Fetch Previous Context from Supabase --- 
-            const { data: latestContext, error: contextError } = await supabase
-                .from(SUPABASE_CONTEXT_TABLE)
-                .select('context_text')
-                .order('generated_at', { ascending: false })
-                .limit(1)
-                .maybeSingle(); // Use maybeSingle to handle zero rows gracefully
-
-            if (contextError) {
-                logger.error('Failed to fetch previous market context from Supabase', contextError);
-                // Continue with default previous context
-            } else if (latestContext) {
-                previousContext = latestContext.context_text;
-                logger.info('Successfully fetched previous market context from Supabase.');
-            } else {
-                logger.info('No previous market context found in Supabase (first run?).');
-            }
-
-            // --- Step 2: Fetch Latest News Overviews from Redis Cache --- 
+        if (forceRefreshOverviews) {
             try {
-                const [cachedTe, cachedRt] = await Promise.all([
-                    redis.get(REDIS_OVERVIEW_TE_KEY),
-                    redis.get(REDIS_OVERVIEW_RTNEWS_KEY)
-                ]);
-                if (cachedTe) teOverview = cachedTe;
-                if (cachedRt) rtNewsOverview = cachedRt;
-                logger.info('Fetched cached news overviews', { 
-                    teFound: !!cachedTe, 
-                    rtFound: !!cachedRt 
-                });
-            } catch (redisError) {
-                logger.error('Failed to fetch news overviews from Redis cache', redisError);
-                // Continue with default overviews
-            }
-
-            // --- Step 3: Fetch Upcoming Economic Catalysts --- 
-            try {
-                const today = new Date();
-                const futureDate = new Date(today);
-                futureDate.setDate(today.getDate() + RECENT_DAYS_FOR_CATALYSTS);
-                
-                const startDate = today.toISOString().split('T')[0];
-                const endDate = futureDate.toISOString().split('T')[0];
-                
-                const econEvents = await this.economicCalendarService.fetchEvents(startDate, endDate, ['US']);
-                const highImportanceEvents = econEvents.filter(event => event.importance >= 1); // Filter for high importance
-                
-                if (highImportanceEvents.length > 0) {
-                    upcomingEconCatalysts = highImportanceEvents
-                        .map(e => `${e.indicator} (${new Date(e.date).toLocaleDateString()})`)
-                        .join(', ');
-                } 
-                logger.info('Fetched upcoming economic catalysts', { count: highImportanceEvents.length });
-            } catch(econError) {
-                logger.error('Failed to fetch/process upcoming economic catalysts', econError);
-            }
-
-            // --- Step 4: Fetch Upcoming Earnings Catalysts --- 
-            try {
-                const today = new Date();
-                const futureDate = new Date(today);
-                futureDate.setDate(today.getDate() + RECENT_DAYS_FOR_CATALYSTS);
-                
-                const startDate = today.toISOString().split('T')[0];
-                const endDate = futureDate.toISOString().split('T')[0];
-
-                const earningsEvents = await this.earningsCalendarService.fetchEarnings(startDate, endDate);
-                // TODO: Filter for significance later (e.g., based on market cap or a predefined list)
-                const significantEarnings = earningsEvents; // For now, include all
-
-                if (significantEarnings.length > 0) {
-                     // Group by date for slightly better formatting
-                     const groupedByDate = significantEarnings.reduce((acc, event) => {
-                         const dateStr = new Date(event.date).toLocaleDateString();
-                         if (!acc[dateStr]) acc[dateStr] = [];
-                         acc[dateStr].push(event.symbol);
-                         return acc;
-                     }, {});
-                     upcomingEarningsCatalysts = Object.entries(groupedByDate)
-                         .map(([date, symbols]) => `${symbols.join(', ')} (${date})`)
-                         .join('; ');
+                const freshRtOverview = await this._generateRealTimeNewsOverview();
+                if (freshRtOverview) {
+                    await this.redisClient.set('overview:realtime-news', freshRtOverview, { EX: 3600 });
+                    logger.info('[MCS] Successfully refreshed and cached RealTimeNews overview in Redis.');
+                    rtNewsOverview = freshRtOverview;
                 }
-                logger.info('Fetched upcoming earnings catalysts', { count: significantEarnings.length });
-            } catch(earnError) {
-                 logger.error('Failed to fetch/process upcoming earnings catalysts', earnError);
+            } catch (error) {
+                logger.error('[MCS] Error refreshing RealTimeNews overview during main generation flow:', error);
             }
 
-            // --- Step 5 & 6: Build Prompt and Call LLM --- 
-            if (!this.googleGenaiService) {
-                logger.error('GoogleGenaiService not available for context synthesis.');
-                throw new Error('LLM service dependency failed.'); // Throw if LLM service is critical
-            }
-            
-            const prompt = this.buildContextPrompt(
-                previousContext,
-                teOverview,
-                rtNewsOverview,
-                upcomingEconCatalysts,
-                upcomingEarningsCatalysts
-            );
-            
-            logger.info('Sending prompt to LLM for context synthesis.');
-            // TODO: Add option to select model (e.g., prefer Pro for this task)
-            // For now, uses the default model configured in GoogleGenaiService
-            const result = await this.googleGenaiService.model.generateContent(prompt);
-            const response = result.response;
-            const newContextText = response.text().trim();
+            // Placeholder for Trading Economics refresh - this is more complex
+            // as it depends on the Python scraper's output which is typically in Supabase.
+            // For now, we'll skip force-refreshing TE overview here.
+            logger.warn('[MCS] Trading Economics overview force refresh is not yet implemented in this flow.');
+        }
 
-            if (!newContextText) {
-                logger.warn('LLM returned empty context text.');
-                // Decide how to handle: store empty, throw error, use default? Let's store empty for now.
-            }
+        // Fetch overviews from cache (either just refreshed or existing)
+        if (!rtNewsOverview) rtNewsOverview = await this.redisClient.get('overview:realtime-news');
+        if (!teOverview) teOverview = await this.redisClient.get('overview:trading-economics');
 
-            // --- Step 7: Store Result in Supabase --- 
-            const { data: insertData, error: insertError } = await supabase
-                .from(SUPABASE_CONTEXT_TABLE)
-                .insert([{ context_text: newContextText || 'Context generation resulted in empty text.' }])
-                .select(); // Select to confirm insertion
+        // Fetch Previous Context
+        const previousContextData = await supabase
+            .from('market_context')
+            .select('context_text, generated_at')
+            .order('generated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        const previousContext = previousContextData.data?.context_text 
+            ? previousContextData.data.context_text.slice(0, MAX_PREVIOUS_CONTEXT_LENGTH) 
+            : 'No previous market context available.';
+        logger.info(`[MCS] Fetched previous market context. Length: ${previousContext.length}, Generated At: ${previousContextData.data?.generated_at || 'N/A'}`);
+        
+        // Fetch News Overviews from Redis (these might have been refreshed above)
+        const finalRtNewsOverview = rtNewsOverview ? rtNewsOverview.slice(0, MAX_NEWS_OVERVIEW_LENGTH) : 'RealTimeNews overview is currently unavailable.';
+        const finalTeOverview = teOverview ? teOverview.slice(0, MAX_NEWS_OVERVIEW_LENGTH) : 'Trading Economics overview is currently unavailable.';
+        logger.info('[MCS] Fetched cached news overviews.', { 
+            rtLength: finalRtNewsOverview.length, 
+            teLength: finalTeOverview.length 
+        });
+
+        // Fetch Upcoming Economic Catalysts (next 7 days, high importance)
+        const economicCatalysts = await this.economicCalendarService.fetchEventsForContext();
+        const economicCatalystsText = economicCatalysts.length > 0 
+            ? economicCatalysts.map(e => `- ${e.date} (${e.country}): ${e.indicator} (Importance: ${e.importance}, Forecast: ${e.forecast || 'N/A'}, Previous: ${e.previous || 'N/A'})`).join('\n')
+            : 'No significant economic catalysts upcoming in the next 7 days.';
+        logger.info(`[MCS] Fetched ${economicCatalysts.length} upcoming economic catalysts.`);
+
+        // Fetch Upcoming Earnings Catalysts (next 7 days, any company for now)
+        const earningsCatalysts = await this.earningsCalendarService.fetchEventsForContext(); // Assumes this method exists and fetches relevant data
+        const earningsCatalystsText = earningsCatalysts.length > 0 
+            ? earningsCatalysts.map(e => `- ${e.date}: ${e.symbol} (EPS Est: ${e.epsEstimated || 'N/A'})`).join('\n')
+            : 'No significant earnings releases upcoming in the next 7 days.';
+        logger.info(`[MCS] Fetched ${earningsCatalysts.length} upcoming earnings catalysts.`);
+        
+        const prompt = this.buildContextPrompt(
+            previousContext,
+            finalRtNewsOverview,
+            finalTeOverview,
+            economicCatalystsText.slice(0, MAX_CATALYSTS_LENGTH),
+            earningsCatalystsText.slice(0, MAX_CATALYSTS_LENGTH)
+        );
+        logger.debug('[MCS] Built context prompt. Length:', prompt.length);
+
+        // Call LLM (Gemini)
+        const { success, contextText, error } = await this.googleGenaiService.generateMarketContext(prompt);
+
+        if (success && contextText) {
+            const { data: newContext, error: insertError } = await supabase
+                .from('market_context')
+                .insert([{ context_text: contextText }])
+                .select()
+                .single();
 
             if (insertError) {
-                logger.error('Failed to store generated context in Supabase', insertError);
-                throw insertError; // Re-throw storage error
-            } else {
-                logger.info('Successfully generated and stored new market context.', { 
-                    newContextId: insertData?.[0]?.id, 
-                    textLength: newContextText?.length 
-                });
+                logger.error('[MCS] Failed to store new market context in Supabase:', insertError);
+                return { success: false, error: 'Database store failed' };
             }
-
-        } catch (error) {
-            logger.error('Error occurred during generateAndStoreContext', {
-                message: error.message,
-                stack: error.stack
-            });
-            // Handle error appropriately, maybe notify admin or retry later
+            logger.info('[MCS] Successfully generated and stored new market context.', { newContextId: newContext.id, textLength: contextText.length });
+            return { success: true, newContextId: newContext.id };
+        } else {
+            logger.error('[MCS] LLM failed to generate market context:', error);
+            return { success: false, error: error || 'LLM generation failed' };
         }
     }
 
-    buildContextPrompt(previousContext, teOverview, rtNewsOverview, econCatalysts, earningsCatalysts) {
-        // Construct the detailed prompt for the LLM
-        const prompt = `
-You are a financial analyst creating a daily market context summary.
+    buildContextPrompt(previousContext, rtNewsOverview, teOverview, economicCatalysts, earningsCatalysts) {
+        let promptText = "You are a financial market analyst. Generate a concise yet comprehensive 'Overall Market Context' summary.";
+        promptText += "\n\nConsider the following information sections provided. If a section is unavailable, note that.";
+        promptText += "\n\nYour output should have two main sections: '1. Updated Summary' and '2. Key Takeaways / Areas to Monitor'.";
+        promptText += "\nIn the 'Updated Summary', compare the current situation (from latest news overviews and catalysts) to the 'Previous Context', explicitly noting continuations or changes in market narrative, sentiment, and key driving factors.";
+        promptText += "\nIn 'Key Takeaways', list bullet points of critical factors, upcoming events, or data points that traders and analysts should be watching closely.";
 
-PREVIOUS CONTEXT (From last update):
----
-${previousContext}
----
+        promptText += "\n\n--- Previous Market Context ---";
+        promptText += `\n${previousContext}`; 
 
-LATEST NEWS OVERVIEWS:
----
-Trading Economics Overview:
-${teOverview}
+        promptText += "\n\n--- Latest RealTimeNews Overview ---";
+        promptText += `\n${rtNewsOverview}`;
 
-RealTimeNews Overview:
-${rtNewsOverview}
----
+        promptText += "\n\n--- Latest Trading Economics Overview ---";
+        promptText += `\n${teOverview}`;
 
-UPCOMING CATALYSTS (Next ${RECENT_DAYS_FOR_CATALYSTS} days):
----
-Economic Events (High Importance):
-${econCatalysts}
+        promptText += "\n\n--- Upcoming Economic Catalysts (Next 7 Days) ---";
+        promptText += `\n${economicCatalysts}`;
 
-Earnings Reports:
-${earningsCatalysts}
----
+        promptText += "\n\n--- Upcoming Earnings Catalysts (Next 7 Days) ---";
+        promptText += `\n${earningsCatalysts}`;
+        
+        // Add a timestamp to the prompt to encourage variation and acknowledge freshness:
+        promptText += `\n\n--- Current Generation Request Time ---`;
+        promptText += `\nThis context is being generated at: ${new Date().toISOString()}.`;
+        promptText += "\nPlease ensure your analysis is fresh and reflects the very latest understanding based on all inputs, highlighting how today's available news (if any) has evolved the situation from the previous context.";
 
-TASK:
-Synthesize the information from the 'LATEST NEWS OVERVIEWS' and 'UPCOMING CATALYSTS'. Compare this to the 'PREVIOUS CONTEXT' to identify key changes, continuations, or resolutions of market themes/narratives. Provide your output in two distinct sections:
+        promptText += "\n\n--- Output Structure --- ";
+        promptText += "\n**1. Updated Summary:**\n[Your synthesized summary here, comparing to previous context and incorporating new inputs.]";
+        promptText += "\n\n**2. Key Takeaways / Areas to Monitor:**\n- [Takeaway 1 based on all inputs]\n- [Takeaway 2 based on all inputs]";
 
-1.  **Updated Summary:** A concise (5-7 sentences) summary of the current market situation, sentiment, and key drivers based on the latest news overviews, explicitly referencing changes from the previous context.
-2.  **Key Takeaways / Areas to Monitor:** 2-4 bullet points highlighting the most important things to watch based on the updated summary and upcoming catalysts (e.g., specific data points, event outcomes, sentiment shifts).
-
-Structure your response clearly with these two sections. Do not include information not present in the provided context.
-
-`;
-        logger.debug('Built context prompt for LLM', { promptLength: prompt.length });
-        return prompt;
+        return promptText;
     }
 } 

@@ -6,38 +6,50 @@ import { supabase } from '../supabase/client.js';
 const router = express.Router();
 
 // --- Instantiate Service ---
-// Ideally, use dependency injection later. For now, create an instance.
+// For a robust setup, dependent services (Cohere, Diffbot, NewsProviderFactory)
+// should ideally be instantiated once and passed to MarketContextService, or a proper DI framework used.
+// For now, MarketContextService attempts to instantiate them internally.
 let marketContextService;
 try {
   marketContextService = new MarketContextService();
 } catch (error) {
-  logger.error('Failed to instantiate MarketContextService in contextRoutes:', error);
-  marketContextService = null; // Ensure routes fail gracefully if service is down
+  logger.error('[contextRoutes] Failed to instantiate MarketContextService:', error);
+  marketContextService = null; 
 }
 
 // --- Manual Trigger Endpoint --- 
 router.post('/generate-now', async (req, res) => {
-  logger.info('POST /api/context/generate-now handler reached');
+  logger.info('POST /api/context/generate-now handler reached - Manual Trigger');
 
   if (!marketContextService) {
-    logger.error('MarketContextService is not available for manual generation.');
+    logger.error('[contextRoutes] MarketContextService is not available for generate-now.');
     return res.status(503).json({ error: 'Context generation service unavailable' });
   }
 
   try {
-    // Call the generation method (don't wait for it to finish, let it run in background?)
-    // Or wait and return success/fail?
-    // Let's wait for now to confirm it runs.
-    await marketContextService.generateAndStoreContext();
-    
-    logger.info('Manual context generation triggered successfully.');
-    res.status(202).json({ message: 'Market context generation initiated successfully.' }); // 202 Accepted
+    // Always force refresh for manual trigger
+    // The actual generation happens asynchronously in the service
+    marketContextService.generateAndStoreContext(true) // Pass true to force refresh
+      .then(result => {
+        if (result.success) {
+          logger.info(`[contextRoutes] MarketContextService.generateAndStoreContext promise resolved successfully for manual trigger. New context ID: ${result.newContextId}`);
+        } else {
+          logger.error(`[contextRoutes] MarketContextService.generateAndStoreContext promise resolved with failure for manual trigger: ${result.error}`);
+        }
+      })
+      .catch(serviceError => {
+        // This catch is for unexpected errors thrown synchronously by generateAndStoreContext or if it's not a promise initially
+        logger.error('[contextRoutes] Error calling or awaiting MarketContextService.generateAndStoreContext for manual trigger:', serviceError);
+      });
+
+    // Respond immediately that the process has been initiated
+    res.status(202).json({ message: 'Market context generation initiated successfully (with overview refresh).' });
 
   } catch (error) {
-    // The service method logs its internal errors, log the trigger error here
-    logger.error('Error triggering manual context generation:', { message: error.message });
+    // This catch is for errors in the route handler itself before calling the service
+    logger.error('[contextRoutes] Error in /generate-now route:', { message: error.message });
     res.status(500).json({ 
-      error: 'Failed to trigger market context generation',
+      error: 'Failed to initiate market context generation',
       message: error.message 
     });
   }
