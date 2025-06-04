@@ -1,0 +1,108 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+## Plan for Running Cron-Reliant Features in Deployed Backend with Supabase
+
+This plan addresses the main automated tasks, reflecting the use of `pythonScraper.ts` invoking `scraper.py` for Trading Economics news.
+
+**I. Trading Economics Scraping & Diffbot Analysis (via Node.js `pythonScraper.ts` & Python `scraper.py`)**
+
+*   **Workflow:** A Node.js component (e.g., `scheduler.mjs` or an API endpoint) periodically calls `NewsScraper.checkForNewNews()` from [`backend/src/services/diffbot/pythonScraper.ts`](mdc:backend/src/services/diffbot/pythonScraper.ts). This TypeScript class then executes the Python script [`backend/src/services/diffbot/scraper.py`](mdc:backend/src/services/diffbot/scraper.py). The Python script scrapes Trading Economics using Selenium, checks for new top articles against its local `last_news.json` state, invokes Diffbot for new articles, and prints JSON output. `pythonScraper.ts` parses this output, performs another check against its in-memory `lastProcessedArticleUrl`, and if new, sends it to the `check-trading-economics` Supabase Edge Function.
+*   **Current State:**
+    *   [`scraper.py`](mdc:backend/src/services/diffbot/scraper.py) exists and uses Selenium, Diffbot.
+    *   [`pythonScraper.ts`](mdc:backend/src/services/diffbot/pythonScraper.ts) exists and uses `PythonShell` to run `scraper.py`.
+    *   `check-trading-economics` Edge Function exists to receive data.
+    *   `scheduler.mjs` exists to call `NewsScraper.checkForNewNews()` periodically.
+*   **Deployment Challenges & Solutions:**
+    1.  **Environment Variables (`DIFFBOT_TOKEN`) in `scraper.py`:**
+        *   **Issue:** Hardcoded `.env.local` path.
+        *   **Solution:** Modify `scraper.py` to use `os.getenv('DIFFBOT_TOKEN')`. Set this variable in the deployment environment (e.g., Supabase Edge Function settings if Python was run there, or server/container environment settings).
+    2.  **State Management (`last_news.json`) in `scraper.py`:**
+        *   **Issue:** Uses a local JSON file, which is not suitable for ephemeral/serverless environments.
+        *   **Solution:** Modify `scraper.py` to store/retrieve the last processed article's identifier (e.g., URL or title) from Redis or a dedicated Supabase table.
+    3.  **Selenium & ChromeDriver in Deployment:**
+        *   **Issue:** Complex to set up Chrome/Chromium and ChromeDriver in many deployment environments.
+        *   **Solutions:**
+            *   **A. Containerization (Docker):** Package Python, Node.js, Selenium, Chrome, ChromeDriver in a Docker image. Requires Dockerfile expertise.
+            *   **B. Serverless Browser Services:** (e.g., Browserless.io, Puppeteer-as-a-Service). Modify `scraper.py` to connect to a remote browser. Incurs costs.
+            *   **C. Re-evaluate Need for Selenium:** If Trading Economics has a direct API or if the "new news check" can be done via simpler HTTP requests (e.g., to an RSS feed or a JSON endpoint they might expose), this would be the simplest. *This is the current approach for the "check" part, Selenium is used for initial discovery on a dynamic page.*
+            *   **D. Platform as a Service (PaaS) with Buildpacks/Nixpacks (e.g., Railway, Heroku):** Deploy the entire backend (Node.js app calling the Python script) to a PaaS. These platforms often have buildpacks that can install Chrome/Chromium and ChromeDriver.
+                *   The `scraper.py` script (and `pythonScraper.ts`) would run within this managed environment.
+                *   **Crucial:** Still requires addressing env variables (point 1) and state management (point 2) to be path-agnostic and use persistent stores.
+                *   The Railway template `https://railway.com/deploy/XXPeWN` is an example of this approach.
+    4.  **Scheduling `pythonScraper.ts` (via `scheduler.mjs`):**
+        *   **Issue:** `scheduler.mjs` uses `node-cron` which runs within the Node.js application process. If the app server isn't running 24/7 or if it's scaled to multiple instances, this can be unreliable or lead to multiple executions. In serverless deployments (like typical Supabase Edge Functions for the main app), `node-cron` won't work as functions are short-lived.
+        *   **Solution for Deployed Environment (e.g., Railway, VM, Docker on a server):**
+            *   If deploying the entire Node.js backend as a long-running server, `node-cron` within `scheduler.mjs` can work, provided the server process is managed (e.g., by PM2 or the PaaS).
+            *   **Alternative/More Robust:** Use a system cron job (Linux cron, Windows Task Scheduler) or a platform-provided scheduler (e.g., Railway background jobs if available, Heroku Scheduler) to execute a command that triggers the logic in `pythonScraper.ts` (e.g., `node -e "require('./backend/src/services/diffbot/scheduler.mjs').runCheck()"`, or by exposing it as a secure internal API endpoint called by the cron).
+*   **Action Plan:**
+    *   `[ ]` **1. Modify `scraper.py`:**
+        *   `[ ]` a. Change `DIFFBOT_TOKEN` loading to use `os.getenv()`.
+        *   `[ ]` b. Change `last_news.json` state management to use Redis (preferred as it's already in use) or a Supabase table.
+    *   `[ ]` **2. Choose & Implement Selenium Deployment Strategy:**
+        *   `[ ]` a. Evaluate PaaS options like Railway (using the template as a base) or manual Docker setup.
+        *   `[ ]` b. Configure the chosen deployment environment with necessary system packages (Chrome/Chromium) and environment variables.
+    *   `[ ]` **3. Configure Scheduler for Deployed `pythonScraper.ts`:**
+        *   `[ ]` a. If using a long-running Node.js server (e.g., on Railway, Docker), ensure `scheduler.mjs` is started with the app and the process is kept alive.
+        *   `[ ]` b. (Recommended for robustness) Or, set up an external cron job (system cron, PaaS scheduler) to trigger the `NewsScraper.checkForNewNews()` logic (e.g., via a small CLI script or a secure endpoint).
+    *   `[ ]` **4. Testing:** Thoroughly test the deployed scraping pipeline.
+
+**II. Placeholder Python Scraper (`monitor_source.py`) for Other Sources**
+
+*   **Goal:** If you need to scrape sources *other* than Trading Economics using a Python-based approach.
+*   **Evaluation:** The script at [`backend/src/scripts/monitor_source.py`](mdc:backend/src/scripts/monitor_source.py) is currently a placeholder. 
+*   **Steps (If Needed for Other Sources):
+    1.  **[ ] Implement `monitor_source.py`:** Follow steps similar to Section I (Python Scraper) in the *previous version* of this plan, focusing on fetching, new item detection (Redis), Diffbot, and then POSTing results to the `check-trading-economics` Edge Function.
+    2.  **[ ] Schedule `monitor_source.py` in Deployment:** Use a system cron job, ensuring correct Python environment, working directory, and environment variables.
+
+**III. `check-trading-economics` Supabase Edge Function & `pg_cron jobid: 26`**
+
+*   **Current Status:** The Edge Function [`backend/src/services/supabase/functions/check-trading-economics/index.ts`](mdc:backend/src/services/supabase/functions/check-trading-economics/index.ts) is a passive receiver of `PythonScraperResult` data. The Supabase `pg_cron` job (`jobid: 26`) calls this Edge Function but sends an empty payload, so it achieves nothing useful.
+*   **Action:**
+    1.  **[ ] Disable/Delete `pg_cron jobid: 26`:** This job is not serving its intended purpose for the current Trading Economics scraping workflow.
+    2.  **[ ] Keep `check-trading-economics` Edge Function:** This function can serve as a valuable, consistent ingestion endpoint if your scrapers (either `scraper.py` directly, `pythonScraper.ts`, or a future `monitor_source.py`) are modified to POST their `PythonScraperResult` JSON data to it. This standardizes how scraped data enters Supabase.
+    3.  **[ ] Environment Variables for Edge Function:** Ensure `DB_URL` and `SERVICE_KEY` are set in Supabase project settings for this Edge Function to store data.
+
+**IV. Overall Market Context Generation (`MarketContextService.js`)**
+
+*   **Workflow:** This service fetches previous context, news overviews (from Redis), and economic/earnings catalysts to generate a new market context summary using an LLM.
+*   **Current State:**
+    *   `MarketContextService.js` exists.
+    *   Manual trigger endpoint `POST /api/context/generate-now` exists.
+    *   `.cursorrules` mentions a plan for a `node-cron` job (`contextScheduler.js` - deferred).
+*   **Deployment Challenge & Solution:**
+    1.  **Scheduling:** Needs to run periodically (e.g., daily).
+    2.  **Environment Variables:** Relies on `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GEMINI_API_KEY`, `REDIS_URL`, etc.
+*   **Action Plan:**
+    *   `[ ]` **1. Create Supabase Edge Function for Context Generation:**
+        *   `[ ]` a. Create a new Supabase Edge Function (e.g., `generate-market-context`).
+        *   `[ ]` b. Move or adapt the core logic from `MarketContextService.generateAndStoreContext()` into this Edge Function.
+        *   `[ ]` c. Ensure all necessary API keys and service URLs are configured as environment variables for this Edge Function in the Supabase dashboard.
+    *   `[ ]` **2. Schedule with `pg_cron`:**
+        *   `[ ]` a. Create a `pg_cron` job in Supabase to call the `generate-market-context` Edge Function on the desired schedule (e.g., daily).
+        *   ```sql
+            -- Example: Run daily at 00:00 UTC
+            SELECT cron.schedule('generate-market-context-daily', '0 0 * * *', 
+              $$SELECT net.http_post(
+                'https://YOUR_PROJECT_REF.supabase.co/functions/v1/generate-market-context',
+                '{}'::jsonb, -- Optional: payload if your function needs it
+                '{}'::jsonb  -- Optional: headers
+              );$$
+            );
+            ```
+    *   `[ ]` **3. Testing:** Test the deployed Edge Function and `pg_cron` job.
+
+**V. General Considerations & Cleanup**
+
+1.  **[ ] Environment Variable Management:**
+    *   **Local:** Use a root `.env` file for local Node.js backend and Python script development.
+    *   **Deployed Node.js Backend:** Set environment variables via your hosting platform's interface.
+    *   **Supabase Edge Functions & `pg_cron`:** Set environment variables in the Supabase Dashboard (Project Settings -> Environment Variables).
+    *   **Python System Cron:** Ensure the cron execution environment for `monitor_source.py` has access to its variables.
+2.  **[ ] Logging:** Ensure all cron-triggered processes (Python script, Node.js scraper, Edge Functions) have robust logging to track execution and diagnose errors.
+3.  **[ ] Timezone Consistency:** Verify timezone settings across your Supabase project, database, and any servers running cron jobs to ensure log timestamps are consistent and make sense. (The future timestamps in logs need to be addressed).
+4.  **[ ] Security:**
+    *   Protect API endpoints triggered by cron jobs if they are public (e.g., with a secret token passed in a header).
+    *   Use Supabase `service_role` keys for server-side operations (like in Edge Functions writing to DB) where appropriate, and ensure Row Level Security (RLS) is active if using `anon` keys for DB access.

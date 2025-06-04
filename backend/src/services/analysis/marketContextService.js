@@ -1,10 +1,10 @@
 import logger from '../../logger.js';
 import { supabase } from '../../supabase/client.js';
-import { getRedisClient } from '../../redis/client.js';
+import { getRedisClient } from '../redis/redisClient.js';
 import { EconomicCalendarService } from '../calendar/EconomicCalendarService.js';
 import { EarningsCalendarService } from '../calendar/EarningsCalendarService.js';
 import { GoogleGenaiService } from './googleGenaiService.js';
-import { NewsProviderFactory } from '../news/NewsProviderFactory.js';
+import { getNewsAdapter } from '../news/NewsProviderFactory.js';
 import { CohereService } from './cohere.js';
 import { DiffbotService } from '../diffbot/DiffbotService.js';
 import { get } from 'lodash-es';
@@ -30,12 +30,10 @@ export class MarketContextService {
         // For refreshing overviews - these might already be instantiated elsewhere
         // Consider dependency injection for a cleaner setup later.
         try {
-            this.newsProviderFactory = new NewsProviderFactory();
             this.cohereService = new CohereService();
             this.diffbotService = new DiffbotService();
         } catch (error) {
-            logger.warn('[MCS] Could not instantiate all services needed for overview refresh:', error.message);
-            this.newsProviderFactory = null;
+            logger.warn('[MCS] Could not instantiate CohereService or DiffbotService for overview refresh:', error.message);
             this.cohereService = null;
             this.diffbotService = null;
         }
@@ -48,13 +46,13 @@ export class MarketContextService {
     }
 
     async _generateRealTimeNewsOverview() {
-        if (!this.newsProviderFactory || !this.cohereService || !this.diffbotService) {
-            logger.warn('[MCS] Required services for RealTimeNews overview refresh are not available.');
+        if (!this.cohereService || !this.diffbotService) {
+            logger.warn('[MCS] CohereService or DiffbotService for RealTimeNews overview refresh are not available.');
             return null;
         }
         try {
             logger.info('[MCS] Attempting to generate fresh RealTimeNews overview...');
-            const adapter = this.newsProviderFactory.getNewsAdapter('realtime-news');
+            const adapter = getNewsAdapter('realtime-news');
             const articles = await adapter.searchNews({ query: 'general market news', limit: 20, sources: null, removeDuplicates: true });
 
             if (!articles || articles.length === 0) {
