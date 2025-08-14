@@ -229,6 +229,4 @@ if (!process.env.VERCEL) {
     console.log(`Server running on port ${PORT}`);
   });
 }
-export default function handler(req, res) {
-  return app(req, res);
-}
+export default app;
