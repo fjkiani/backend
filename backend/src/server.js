@@ -218,7 +218,10 @@ app.get('/api/test-diffbot', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  // Keep this one for confirmation the server started
-  console.log(`Server running on port ${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    // Keep this one for confirmation the server started
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+export default app;
