@@ -66,6 +66,7 @@ import realTimeNewsRoutes from './routes/realTimeNewsRoutes.js';
 import diffbotRoutes from './routes/diffbotRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
 import contextRoutes from './routes/contextRoutes.js';
+import scheduleRoutes from './routes/scheduleRoutes.js';
 
 const app = express();
 const scheduler = new NewsScheduler();
@@ -125,6 +126,9 @@ app.use('/api/calendar', calendarRoutes);
 
 // Add Context routes
 app.use('/api/context', contextRoutes);
+
+// Add Schedule routes (protected cron trigger)
+app.use('/api/schedule', scheduleRoutes);
 
 // News scraping endpoint
 app.get('/api/scrape/trading-economics', async (req, res) => {
