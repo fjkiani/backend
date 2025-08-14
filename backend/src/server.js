@@ -69,7 +69,10 @@ import contextRoutes from './routes/contextRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 
 const app = express();
-const scheduler = new NewsScheduler();
+let scheduler;
+if (!process.env.VERCEL) {
+  scheduler = new NewsScheduler();
+}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -90,9 +93,11 @@ try {
   storage = new SupabaseStorage();
   logger.info('SupabaseStorage initialized successfully');
   
-  // Start the scheduler after storage is initialized
-  scheduler.start();
-  logger.info('News scheduler started');
+  // Start the scheduler only in non-Vercel environments
+  if (scheduler) {
+    scheduler.start();
+    logger.info('News scheduler started');
+  }
 } catch (error) {
   logger.error('Failed to initialize services:', error);
   process.exit(1);
