@@ -2,12 +2,23 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import path from 'path';
+import { NewsScheduler } from './services/news/scheduler.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load environment variables from .env file
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+// --- Dotenv Debug --- 
+// console.log('[Dotenv Debug] Attempting to read REAL_TIME_NEWS_API_KEY.');
+// console.log(`[Dotenv Debug] Value found: ${process.env.REAL_TIME_NEWS_API_KEY}`);
+// if (!process.env.REAL_TIME_NEWS_API_KEY) {
+//   console.error('[Dotenv Debug] REAL_TIME_NEWS_API_KEY is UNDEFINED or EMPTY after dotenv.config()');
+// } else {
+//   console.log('[Dotenv Debug] REAL_TIME_NEWS_API_KEY seems loaded correctly.');
+// }
+// --- End Dotenv Debug ---
 
 // Manually set environment variables
 process.env.VITE_SUPABASE_URL = 'https://gpirjathvfoqjurjhdxq.supabase.co';
@@ -21,6 +32,26 @@ process.env.DB_URL = process.env.VITE_SUPABASE_URL;
 process.env.SERVICE_KEY = process.env.VITE_SUPABASE_KEY;
 process.env.DIFFBOT_TOKEN = process.env.VITE_DIFFBOT_TOKEN;
 
+// Debug environment loading
+// console.log('Environment loaded:', {
+//   envKeys: Object.keys(process.env).filter(key => 
+//     key.includes('SUPABASE') || 
+//     key.includes('DB_') || 
+//     key.includes('SERVICE_') ||
+//     key.includes('REDIS') ||
+//     key.includes('VITE_') ||
+//     key.includes('COHERE')
+//   ),
+//   supabase: {
+//     hasUrl: !!process.env.VITE_SUPABASE_URL,
+//     hasKey: !!process.env.VITE_SUPABASE_KEY,
+//     urlStart: process.env.VITE_SUPABASE_URL?.substring(0, 20) + '...',
+//   },
+//   cohere: {
+//     hasKey: !!process.env.COHERE_API_KEY
+//   }
+// });
+
 // Now import the rest of the modules
 import express from 'express';
 import cors from 'cors';
@@ -30,6 +61,7 @@ import config from './config.js';
 import { initializeRoutes as initNewsRoutes } from './routes/news.js';
 import analysisRoutes from './routes/analysis.js';
 import axios from 'axios';
+import { SupabaseStorage } from './services/storage/supabase/supabaseStorage.js';
 import realTimeNewsRoutes from './routes/realTimeNewsRoutes.js';
 import diffbotRoutes from './routes/diffbotRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
@@ -37,58 +69,42 @@ import contextRoutes from './routes/contextRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 
 const app = express();
-
-// Lazy initialization of services
-let storage;
 let scheduler;
-
-async function initializeServices() {
-  if (storage) return storage;
-  
-  try {
-    const { SupabaseStorage } = await import('./services/storage/supabase/supabaseStorage.js');
-    storage = new SupabaseStorage();
-    logger.info('SupabaseStorage initialized successfully');
-    
-    // Start the scheduler only in non-Vercel environments
-    if (!process.env.VERCEL) {
-      const { NewsScheduler } = await import('./services/news/scheduler.mjs');
-      scheduler = new NewsScheduler();
-      scheduler.start();
-      logger.info('News scheduler started');
-    }
-    
-    return storage;
-  } catch (error) {
-    logger.error('Failed to initialize services:', error);
-    // Don't throw - let the app start without storage for now
-    return null;
-  }
+if (!process.env.VERCEL) {
+  scheduler = new NewsScheduler();
 }
 
 // Health check endpoint
-app.get('/api/health', async (req, res) => {
-  try {
-    await initializeServices();
-    res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      services: {
-        redis: !!process.env.REDIS_URL,
-        supabase: !!process.env.VITE_SUPABASE_URL,
-        diffbot: !!process.env.VITE_DIFFBOT_TOKEN,
-        storage: !!storage
-      }
-    });
-  } catch (error) {
-    logger.error('Health check error:', error);
-    res.status(500).json({
-      status: 'error',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {
+      redis: !!process.env.REDIS_URL,
+      supabase: !!process.env.VITE_SUPABASE_URL,
+      diffbot: !!process.env.VITE_DIFFBOT_TOKEN
+    }
+  });
 });
+
+// Initialize SupabaseStorage first
+let storage;
+try {
+  storage = new SupabaseStorage();
+  logger.info('SupabaseStorage initialized successfully');
+  
+  // Start the scheduler only in non-Vercel environments
+  if (scheduler) {
+    scheduler.start();
+    logger.info('News scheduler started');
+  }
+} catch (error) {
+  logger.error('Failed to initialize services:', error);
+  // Don't exit in Vercel - just log and continue
+  if (!process.env.VERCEL) {
+    process.exit(1);
+  }
+}
 
 // Configure CORS
 app.use(cors({
@@ -100,17 +116,9 @@ app.use(cors({
 // Add body parser for JSON
 app.use(express.json());
 
-// Initialize routes with lazy storage
-app.use('/api/news', async (req, res, next) => {
-  try {
-    const storageInstance = await initializeServices();
-    const newsRouter = initNewsRoutes(storageInstance);
-    newsRouter(req, res, next);
-  } catch (error) {
-    logger.error('News routes error:', error);
-    res.status(500).json({ error: 'Service initialization failed' });
-  }
-});
+// Initialize routes with storage instance
+const newsRouter = initNewsRoutes(storage);
+app.use('/api/news', newsRouter);
 
 // Add analysis routes
 app.use('/api/analysis', analysisRoutes);
@@ -133,11 +141,6 @@ app.use('/api/schedule', scheduleRoutes);
 // News scraping endpoint
 app.get('/api/scrape/trading-economics', async (req, res) => {
   try {
-    const storageInstance = await initializeServices();
-    if (!storageInstance) {
-      return res.status(500).json({ error: 'Storage not available' });
-    }
-    
     logger.info('Starting news scraping...', {
       forceFresh: req.query.fresh === 'true',
       timestamp: new Date().toISOString()
@@ -155,7 +158,7 @@ app.get('/api/scrape/trading-economics', async (req, res) => {
     // Store scraped articles in Supabase
     for (const article of articles) {
       try {
-        await storageInstance.storeArticle(article);
+        await storage.storeArticle(article);
         logger.info('Stored article:', {
           title: article.title,
           created_at: article.created_at,
@@ -229,7 +232,6 @@ if (!process.env.VERCEL) {
     console.log(`Server running on port ${PORT}`);
   });
 }
-
 export default function handler(req, res) {
   return app(req, res);
 }
