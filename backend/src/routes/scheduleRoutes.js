@@ -64,31 +64,50 @@ router.post('/run-minute-scrape', async (req, res) => {
 			return res.status(401).json({ ok: false, error: 'unauthorized' });
 		}
 
-		// Market hours guard (US/Eastern)
-		if (!isWithinMarketHoursEastern()) {
-			return res.json({ ok: true, skipped: 'outside_market_hours' });
-		}
+		// Check if we're in market hours
+		const isMarketHours = isWithinMarketHoursEastern();
+		
+		// Get frequency from query param (default to market hours logic)
+		const frequency = req.query.frequency || (isMarketHours ? 'high' : 'low');
+		
+		// Set lock TTL based on frequency
+		// high = 30s intervals, need 25s lock
+		// low = 1h intervals, need 55min lock
+		const lockTtl = frequency === 'high' ? 25 : 3300; // 55 minutes
+		const lockKey = `te:scrape:lock:${frequency}`;
 
 		// Prevent overlapping runs
-		const lockKey = 'te:scrape:lock';
-		const gotLock = await acquireLock(lockKey, 55); // expire just under a minute
+		const gotLock = await acquireLock(lockKey, lockTtl);
 		if (!gotLock) {
-			return res.json({ ok: true, skipped: 'locked' });
+			return res.json({ ok: true, skipped: 'locked', frequency });
 		}
 
-		logger.info('Minute scrape triggered');
-		const articles = await scrapeNews(false);
+		logger.info('Scrape triggered', { frequency, isMarketHours });
+		
+		// Run scraping with appropriate intensity
+		// During market hours: fresh data more important
+		// Outside market hours: can use cached/less frequent updates
+		const forceFresh = isMarketHours;
+		const articles = await scrapeNews(forceFresh);
 
 		if (Array.isArray(articles) && articles.length > 0) {
 			await storage.storeArticles(articles);
-			logger.info('Stored articles from minute scrape', {
+			logger.info('Stored articles from scheduled scrape', {
 				count: articles.length,
-				firstTitle: articles[0]?.title
+				firstTitle: articles[0]?.title,
+				frequency,
+				isMarketHours
 			});
 		}
 
 		await releaseLock(lockKey);
-		return res.json({ ok: true, stored: articles?.length || 0 });
+		return res.json({ 
+			ok: true, 
+			stored: articles?.length || 0, 
+			frequency,
+			isMarketHours,
+			forceFresh
+		});
 	} catch (error) {
 		logger.error('run-minute-scrape error', { error: error.message });
 		return res.status(500).json({ ok: false, error: error.message });
