@@ -3,7 +3,6 @@ import { ProcessedArticle } from '../../services/news/types';
 import { NewsCard } from './NewsCard';
 import { Newspaper, Loader2, RefreshCw, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../services/supabase/client';
 import { config } from '../../config';
 
 interface NewsGridProps {
@@ -19,15 +18,13 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
   const { data: tradingEconomicsArticles, isLoading: isTradingEconomicsLoading, error: tradingEconomicsError, refetch } = useQuery({
     queryKey: ['articles'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('articles')
-        .select('*')
-        .eq('source', 'Trading Economics')
-        .order('created_at', { ascending: false });
+      const response = await fetch(`${config.BACKEND_URL}/api/news`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
       
-      if (error) throw error;
-      
-      return (data || []).map(article => ({
+      return (data || []).map((article: any) => ({
         ...article,
         raw: {
           title: article.title,
@@ -60,21 +57,22 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
     setLogs([]); // Clear previous logs
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 290000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // Reduced timeout
 
       setLogs(prev => [...prev, {
-        level: 'info',
-        message: 'Starting news refresh. This may take a few minutes...',
+        level: 'info', 
+        message: 'Triggering Trading Economics + Diffbot scraper...',
         timestamp: new Date().toISOString()
       }]);
 
-              console.log('Making request to:', `${config.BACKEND_URL}/api/scrape/trading-economics?fresh=true`);
+      console.log('Making request to:', `${config.BACKEND_URL}/api/schedule/trigger-te-scrape`);
         
-        const response = await fetch(`${config.BACKEND_URL}/api/scrape/trading-economics?fresh=true`, {
-        method: 'GET',
+      const response = await fetch(`${config.BACKEND_URL}/api/schedule/trigger-te-scrape`, {
+        method: 'POST',
         headers: {
           'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer 56f52b6634a410679d99bd631000ae6782a786a71e21e3f2494a36adac0d8e3f'
         },
         signal: controller.signal
       });
@@ -168,7 +166,7 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
       </div>
 
       {tradingEconomicsArticles && tradingEconomicsArticles.length > 0 ? (
-        tradingEconomicsArticles.map((article) => (
+        tradingEconomicsArticles.map((article: any) => (
           <NewsCard key={article.id} article={article} />
         ))
       ) : (

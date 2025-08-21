@@ -114,4 +114,40 @@ router.post('/run-minute-scrape', async (req, res) => {
 	}
 });
 
+router.post('/trigger-te-scrape', async (req, res) => {
+	try {
+		// Simple bearer token auth
+		const authHeader = req.headers.authorization || '';
+		const expected = process.env.CRON_TOKEN ? `Bearer ${process.env.CRON_TOKEN}` : null;
+		if (!expected || authHeader !== expected) {
+			return res.status(401).json({ ok: false, error: 'unauthorized' });
+		}
+
+		// Respond immediately
+		res.json({ ok: true, message: 'Trading Economics scraper triggered', timestamp: new Date().toISOString() });
+
+		// Run scraper in background (don't await)
+		setImmediate(async () => {
+			try {
+				logger.info('Background Trading Economics scrape triggered');
+				const { scrapeNews } = await import('../scraper.js');
+				const articles = await scrapeNews(true); // force fresh
+				
+				if (Array.isArray(articles) && articles.length > 0) {
+					logger.info('Background scrape completed', {
+						count: articles.length,
+						firstTitle: articles[0]?.title
+					});
+				}
+			} catch (error) {
+				logger.error('Background scrape error', { error: error.message });
+			}
+		});
+		
+	} catch (error) {
+		logger.error('trigger-te-scrape error', { error: error.message });
+		return res.status(500).json({ ok: false, error: error.message });
+	}
+});
+
 export default router; 
