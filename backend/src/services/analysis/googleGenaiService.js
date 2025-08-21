@@ -5,8 +5,9 @@ import logger from '../../logger.js';
 // Switch to Pro model for deeper analysis tasks
 // const GEMINI_MODEL_NAME = "gemini-1.5-pro-latest"; 
 // const GEMINI_MODEL_NAME = "gemini-2.0-flash-thinking-exp-01-21"; 
-const GEMINI_MODEL_NAME = "gemini-1.5-flash-latest"; // Use standard Flash model
-const MAX_OUTPUT_TOKENS = 1024; // Keep this for now, adjust if needed for Pro
+const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17"; // User requested experimental model
+// const GEMINI_MODEL_NAME = "gemini-1.5-flash-latest"; // Use standard Flash model
+const MAX_OUTPUT_TOKENS = 2048; // Increased for Pro model, should be fine for experimental flash
 const TEMPERATURE = 0.4; // Similar to Cohere setting
 const TOP_P = 1;
 const TOP_K = 1;
@@ -249,7 +250,36 @@ Avoid speculation or external data not present in the provided context sections.
 
 ${analysisTitle}`;
   }
-  // --- End Method ---
+
+  async generateText(promptString) {
+    logger.info('GoogleGenaiService: Generating text for custom prompt.');
+    if (!promptString || typeof promptString !== 'string' || promptString.trim() === '') {
+        logger.warn('GoogleGenaiService: generateText called with empty or invalid prompt.');
+        return { success: false, text: null, error: 'Prompt cannot be empty.' };
+    }
+    logger.debug('GoogleGenaiService: Prompt for generateText:', { promptStart: promptString.substring(0, 200) + '...' });
+
+    try {
+        const result = await this.model.generateContent(promptString);
+        const response = result.response;
+        const textContent = response.text().trim();
+        
+        if (!textContent) {
+            logger.warn('GoogleGenaiService: generateText received empty content from model.');
+            return { success: false, text: null, error: 'Model returned empty content.'};
+        }
+        
+        logger.info('GoogleGenaiService: Text generation successful.');
+        return { success: true, text: textContent, error: null };
+
+    } catch (error) {
+        logger.error('GoogleGenaiService: generateText failed:', {
+            message: error.message || 'Unknown error during text generation',
+            // Consider logging more error details if available and safe
+        });
+        return { success: false, text: null, error: error.message || 'Error during text generation with Gemini.' };
+    }
+  }
 }
 
 // export default GoogleGenaiService; 

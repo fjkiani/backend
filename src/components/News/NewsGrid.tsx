@@ -4,14 +4,12 @@ import { NewsCard } from './NewsCard';
 import { Newspaper, Loader2, RefreshCw, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase/client';
+import { config } from '../../config';
 
 interface NewsGridProps {
   articles: ProcessedArticle[];
   loading: boolean;
 }
-
-// Use environment variable for backend URL, fallback to local development URL
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -70,9 +68,9 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
         timestamp: new Date().toISOString()
       }]);
 
-      console.log('Making request to:', `${BACKEND_URL}/api/scrape/trading-economics?fresh=true`);
-
-      const response = await fetch(`${BACKEND_URL}/api/scrape/trading-economics?fresh=true`, {
+              console.log('Making request to:', `${config.BACKEND_URL}/api/scrape/trading-economics?fresh=true`);
+        
+        const response = await fetch(`${config.BACKEND_URL}/api/scrape/trading-economics?fresh=true`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -111,7 +109,7 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
       if (error.name === 'AbortError') {
         errorMessage = 'The request took too long to complete. The scraping process will continue in the background. Please check back in a few minutes.';
       } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        errorMessage = `Backend server is not accessible at ${BACKEND_URL}. Please check the connection.`;
+        errorMessage = `Backend server is not accessible at ${config.BACKEND_URL}. Please check the connection.`;
       } else if (error.message.includes('504')) {
         errorMessage = 'The request timed out. The scraping process will continue in the background. Please check back in a few minutes.';
       } else {

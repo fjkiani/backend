@@ -1,28 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Loader2, AlertCircle, CalendarDays, Clock, CheckCircle, ArrowRight, Star, Info, MessageSquare } from 'lucide-react';
 import { useMarketContext } from '../../hooks/useMarketContext';
-
-// Point to the local backend server during development
-const BACKEND_URL = 'http://localhost:3001';
+import { config } from '../../config';
 
 // Define an interface for the expected event structure based on API sample
 interface CalendarEvent {
     id: string;
-    date: string; // ISO string
+    date: string; // ISO string (maps to dateUtc from new API)
     country: string;
     indicator: string;
     title: string; // May be redundant with indicator
-    importance: number; // -1 Low, 0 Med, 1 High (Assumption based on previous)
+    importance: number; // -1 Low, 0 Med, 1 High (mapped from volatility)
     actual: number | string | null;
-    forecast: number | string | null;
+    forecast: number | string | null; // (mapped from consensus)
     previous: number | string | null;
     unit?: string;
-    scale?: string;
-    comment?: string;
-    link?: string;
-    currency?: string;
-    period?: string;
-    source?: string;
+    currency?: string; // (from currencyCode)
+    revised?: number | string | null; // New field
 }
 
 // Helper function to format time
@@ -165,8 +159,7 @@ export const EconomicCalendar: React.FC = () => {
             setInterpretationError(null);
             // Use dates from dateRangeDetails based on selectedRange
             const { start, end } = dateRangeDetails; 
-            const countries = 'US'; 
-            const url = `${BACKEND_URL}/api/calendar/events?from=${start}&to=${end}&countries=${countries}`;
+            const url = `${config.BACKEND_URL}/api/calendar/events?from=${start}&to=${end}`; // Removed countries param
 
             try {
                 console.info(`Fetching calendar events from: ${url}`);
@@ -222,7 +215,7 @@ export const EconomicCalendar: React.FC = () => {
         const contextToSend = overallMarketContext || "Overall market context was not available.";
 
         try {
-            const response = await fetch(`${BACKEND_URL}/api/calendar/interpret-event`, {
+            const response = await fetch(`${config.BACKEND_URL}/api/calendar/interpret-event`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

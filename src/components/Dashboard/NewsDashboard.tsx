@@ -15,9 +15,7 @@ import { EconomicCalendar } from '../Calendar/EconomicCalendar';
 import { EarningsCalendar } from '../Calendar/EarningsCalendar';
 import { useMarketContext } from '../../hooks/useMarketContext';
 import { MarketContextDisplay } from '../Context/MarketContextDisplay';
-
-// Assume backend URL is defined or imported
-const BACKEND_URL = 'http://localhost:3001';
+import { config } from '../../config';
 
 export const NewsDashboard: React.FC = () => {
   const { news, loading: newsLoading, error: newsError } = useNewsScraper();
@@ -60,7 +58,7 @@ export const NewsDashboard: React.FC = () => {
           content: a.content // Assuming content holds the summary from useNewsScraper
       }));
       
-      const response = await fetch(`${BACKEND_URL}/api/analysis/trading-economics-overview`, {
+      const response = await fetch(`${config.BACKEND_URL}/api/analysis/trading-economics-overview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +132,7 @@ export const NewsDashboard: React.FC = () => {
     setIsGeneratingContext(true);
     setTriggerError(null);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/context/generate-now`, {
+      const response = await fetch(`${config.BACKEND_URL}/api/context/generate-now`, {
         method: 'POST',
       });
       if (!response.ok || response.status !== 202) { // Check for 202 Accepted

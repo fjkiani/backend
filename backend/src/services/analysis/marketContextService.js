@@ -31,11 +31,24 @@ export class MarketContextService {
         // Consider dependency injection for a cleaner setup later.
         try {
             this.cohereService = new CohereService();
-            this.diffbotService = new DiffbotService();
+
+            // Correctly instantiate DiffbotService
+            const diffbotToken = process.env.DIFFBOT_TOKEN;
+            if (!diffbotToken) {
+                logger.error('[MCS] Diffbot token (DIFFBOT_TOKEN) not found in environment variables.');
+                throw new Error('Diffbot token is required for DiffbotService.'); // This will be caught below
+            }
+            this.diffbotService = new DiffbotService({ apiToken: diffbotToken }, logger); // Pass config and logger
+
         } catch (error) {
-            logger.warn('[MCS] Could not instantiate CohereService or DiffbotService for overview refresh:', error.message);
-            this.cohereService = null;
-            this.diffbotService = null;
+            // This catch block will now correctly report if Cohere key is missing OR if Diffbot token is missing
+            logger.warn('[MCS] Could not instantiate CohereService or DiffbotService for overview refresh:', { 
+                errorMessage: error.message,
+                service: error.message.includes('Cohere') ? 'CohereService' : (error.message.includes('Diffbot') ? 'DiffbotService' : 'UnknownService')
+            });
+            if (error.message.includes('Cohere')) this.cohereService = null;
+            if (error.message.includes('Diffbot')) this.diffbotService = null;
+            // If it's a different error, both might remain in their default (potentially null) state if not yet assigned.
         }
 
         if (!this.redisClient) {
@@ -175,7 +188,21 @@ export class MarketContextService {
         logger.debug('[MCS] Built context prompt. Length:', prompt.length);
 
         // Call LLM (Gemini)
-        const { success, contextText, error } = await this.googleGenaiService.generateMarketContext(prompt);
+        logger.debug('[MCS] Calling GoogleGenaiService.generateText for market context...');
+        const llmResult = await this.googleGenaiService.generateText(prompt);
+        let success, contextText, error;
+
+        if (llmResult) {
+            success = llmResult.success;
+            contextText = llmResult.text; // 'text' is the field in the new method's return
+            error = llmResult.error;
+        } else {
+            // Fallback if llmResult is unexpectedly null or undefined
+            success = false;
+            contextText = null;
+            error = 'LLM service returned an unexpected null/undefined result.';
+            logger.error('[MCS] GoogleGenaiService.generateText returned null or undefined.');
+        }
 
         if (success && contextText) {
             const { data: newContext, error: insertError } = await supabase

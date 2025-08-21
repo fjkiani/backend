@@ -1,0 +1,74 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Economic Calendar API Integration (forex-api2.p.rapidapi.com)
+
+This document outlines the integration of a new external API for fetching economic calendar data.
+
+## 1. Overview of New Economic Calendar API
+
+The Economic Calendar feature has been updated to use the `forex-api2.p.rapidapi.com` API. This change was implemented to improve the reliability and timeliness of `actual` (released) values for economic events, especially for current-day data.
+
+*   **API Provider:** RapidAPI
+*   **API Hostname:** `forex-api2.p.rapidapi.com`
+*   **Specific Endpoint Used:** `/economic-calendar`
+
+### Crucial Environment Variable
+
+For this integration to function, the following environment variable **MUST** be set in the `backend/.env` file and in any deployment environments (e.g., Vercel):
+
+*   `FOREX_API2_RAPIDAPI_KEY`
+    *   *Note: The actual key value should be managed securely by the user/administrator in their environment configurations.*
+
+## 2. Backend Implementation Details
+
+The primary backend logic for interacting with this new API resides in the `EconomicCalendarService` and is exposed via `calendarRoutes`.
+
+### `EconomicCalendarService.js`
+
+Reference: `[backend/src/services/calendar/EconomicCalendarService.js](mdc:backend/src/services/calendar/EconomicCalendarService.js)`
+
+*   **`async fetchEvents(startDate)`:**
+    *   This method now fetches economic events for a **single day**, as specified by the `startDate` (YYYY-MM-DD) parameter.
+    *   **US-Only Filter:** After retrieving data from the external API, this service method internally filters all events to return **only those where the `countryCode` is 'US'**. This ensures that subsequent processing and frontend display are focused on US economic events.
+    *   **Data Mapping:** Key fields from the `forex-api2` response (`calendarEntries`) are mapped to our internal `CalendarEvent` structure. Notable mappings include:
+        *   `calendarEntries[].id` (UUID) -> `id`
+        *   `calendarEntries[].name` -> `indicator` and `title`
+        *   `calendarEntries[].dateUtc` -> `date` (ISO string)
+        *   `calendarEntries[].countryCode` -> `country`
+        *   `calendarEntries[].volatility` -> `importance` (mapped: "NONE"/-1, "LOW"/-1, "MEDIUM"/0, "HIGH"/1)
+        *   `calendarEntries[].actual` -> `actual`
+        *   `calendarEntries[].consensus` -> `forecast`
+        *   `calendarEntries[].previous` -> `previous`
+        *   `calendarEntries[].unit` -> `unit`
+        *   `calendarEntries[].currencyCode` -> `currency` (new field)
+        *   `calendarEntries[].revised` -> `revised` (new field)
+    *   Caching: US-only events for the specified `startDate` are cached in Redis.
+
+*   **`async fetchSingleEventDetails(originalEvent)`:**
+    *   This method is used to get the freshest data for a specific event, typically when a user requests an interpretation.
+    *   It re-fetches all US events for the `originalEvent`'s date (using `fetchEvents(eventDateISO)`) to ensure it has the latest data from the API provider for that day.
+    *   It then finds and returns the specific event from this daily list using the `originalEvent.id`.
+
+### `calendarRoutes.js`
+
+Reference: `[backend/src/routes/calendarRoutes.js](mdc:backend/src/routes/calendarRoutes.js)`
+
+*   **`GET /api/calendar/events`:**
+    *   This endpoint now accepts `from` and `to` query parameters to support fetching economic events over a date range (e.g., `/api/calendar/events?from=2025-06-01&to=2025-06-07`).
+    *   **Mechanism:**
+        1.  It iterates day-by-day from the `from` date to the `to` date.
+        2.  For each `currentDateString` in the range, it calls `calendarService.fetchEvents(currentDateString)`. As detailed above, the service method fetches from `forex-api2` and filters for US-only events for that day.
+        3.  The US-only events from each day are aggregated into a single list.
+        4.  This final list is sorted by date before being sent in the JSON response.
+    *   **Country Filtering:** The `countries` query parameter has been removed from this route, as the service layer now hardcodes the 'US' filter.
+    *   **Range Limit:** A maximum date range of 31 days is enforced to prevent overly long or resource-intensive requests.
+
+## 3. Key Considerations & Frontend Impact
+
+*   **Data Reliability:** The `forex-api2.p.rapidapi.com` API is expected to provide more timely `actual` values for economic events compared to the previously used source.
+*   **Frontend Date Ranges:** The frontend's existing date range selectors (e.g., "This Week", "Last Week") should now function correctly as the backend `GET /api/calendar/events` endpoint supports `from` and `to` parameters for fetching US-only events across ranges.
+*   **Frontend Country Display:** The data received by the frontend for the economic calendar via `GET /api/calendar/events` will now be **exclusively for the 'US'**. Any frontend logic previously attempting to filter for 'US' events might be redundant but should not cause issues.
+*   **Event Object Structure:** The `CalendarEvent` objects processed and displayed by the frontend will adhere to the data structure mapped from the `forex-api2` API (as detailed in the `EconomicCalendarService.js` section). Frontend components should be compatible with this structure.

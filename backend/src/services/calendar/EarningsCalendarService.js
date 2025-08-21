@@ -309,6 +309,51 @@ export class EarningsCalendarService {
             return null; // Return null on API error
         }
     }
+
+    async fetchEventsForContext(daysToFetch = 7) {
+        logger.info(`[EarningsCalendarService] Fetching earnings events for context. Days: ${daysToFetch}`);
+        const today = new Date();
+        const endDate = new Date(today);
+        endDate.setDate(today.getDate() + daysToFetch - 1); // -1 because 'to' is inclusive
+
+        const fromDateString = today.toISOString().split('T')[0];
+        const toDateString = endDate.toISOString().split('T')[0];
+
+        let upcomingEarningsEvents = [];
+
+        try {
+            // fetchEarnings handles caching and fetching from FMP
+            const rawEvents = await this.fetchEarnings(fromDateString, toDateString);
+
+            if (rawEvents && rawEvents.length > 0) {
+                // Ensure events are truly upcoming (FMP might return past events if 'from' is in past for a weekly range)
+                // And map to a slightly more consistent structure if needed, though FMP is usually good.
+                const now = new Date();
+                now.setHours(0,0,0,0); // Normalize for date comparison
+
+                upcomingEarningsEvents = rawEvents.filter(event => {
+                    const eventDate = new Date(event.date);
+                    return eventDate >= now; // Ensure event date is today or in the future
+                });
+
+                // Sort by date, then by symbol
+                upcomingEarningsEvents.sort((a, b) => {
+                    const dateA = new Date(a.date).getTime();
+                    const dateB = new Date(b.date).getTime();
+                    if (dateA !== dateB) {
+                        return dateA - dateB;
+                    }
+                    return a.symbol.localeCompare(b.symbol);
+                });
+            }
+        } catch (error) {
+            logger.error(`[EarningsCalendarService] Error fetching earnings for context (${fromDateString} to ${toDateString}):`, error);
+            // Return empty array on error
+        }
+
+        logger.info(`[EarningsCalendarService] Found ${upcomingEarningsEvents.length} upcoming earnings events for context.`);
+        return upcomingEarningsEvents;
+    }
 }
 
 // Export an instance
