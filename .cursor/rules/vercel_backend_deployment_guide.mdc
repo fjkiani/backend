@@ -1,0 +1,215 @@
+# Vercel Backend Deployment Success Guide
+
+This document outlines the complete process of successfully deploying our News Scraper backend to Vercel, including all issues encountered and their solutions.
+
+## Final Working Configuration
+
+**Production URL:** https://backend-ekqwi6l6y-fjkianis-projects.vercel.app
+**Key Endpoints:**
+- `GET /api/health` - Health check with service status
+- `POST /api/schedule/run-minute-scrape` - Protected endpoint for scheduled scraping
+
+## Project Structure
+
+```
+backend/
+├── src/
+│   ├── server.js              # Main Express app with handler export
+│   ├── logger.js              # Winston logger (console-only for Vercel)
+│   ├── routes/
+│   │   └── scheduleRoutes.js  # Protected cron endpoint
+│   └── services/
+│       └── storage/supabase/  # Article storage
+├── vercel.json               # Vercel configuration
+└── package.json             # Dependencies including lodash-es
+```
+
+## Critical Issues Encountered & Solutions
+
+### 1. FUNCTION_INVOCATION_FAILED Errors
+
+**Issue:** Serverless function crashed immediately on invocation
+**Root Causes:**
+- Missing `lodash-es` dependency causing import failures
+- Winston file transports trying to write to read-only filesystem
+- `process.exit(1)` calls killing the serverless function
+- Heavy module imports during function initialization
+
+**Solutions:**
+```javascript
+// 1. Added missing dependency
+npm install lodash-es
+
+// 2. Removed file transports from logger.js
+const logger = winston.createLogger({
+  transports: [
+    new winston.transports.Console({ /* config */ })
+    // Removed: File transports for Vercel compatibility
+  ]
+});
+
+// 3. Conditional process.exit in server.js
+} catch (error) {
+  logger.error('Failed to initialize services:', error);
+  // Don't exit in Vercel - just log and continue
+  if (!process.env.VERCEL) {
+    process.exit(1);
+  }
+}
+
+// 4. Proper Vercel handler export
+export default function handler(req, res) {
+  return app(req, res);
+}
+```
+
+### 2. Route Not Found (404) Issues
+
+**Issue:** API routes returning 404 instead of executing
+**Root Cause:** Incorrect Vercel configuration and export pattern
+
+**Solution:**
+```json
+// vercel.json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "src/server.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "src/server.js"
+    }
+  ]
+}
+```
+
+### 3. Environment Variable Configuration
+
+<!--  -->
+
+**Key Points:**
+- Both `DIFFBOT_TOKEN` and `VITE_DIFFBOT_TOKEN` needed for different parts of codebase
+- `CRON_TOKEN` generated via: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+## Deployment Process
+
+### 1. Local Development Setup
+```bash
+# Install dependencies
+cd backend
+npm install
+
+# Test locally
+npm run dev
+curl http://localhost:3001/api/health
+```
+
+### 2. Vercel Deployment
+```bash
+# Deploy to production
+npx vercel --cwd backend --prod --yes
+
+# Check deployment status
+npx vercel inspect <deployment-url>
+
+# View logs if issues occur
+npx vercel logs <deployment-url>
+```
+
+### 3. Verification Steps
+```bash
+# Health check
+curl -sS https://backend-ekqwi6l6y-fjkianis-projects.vercel.app/api/health
+
+# Protected endpoint test
+curl -sS -X POST https://backend-ekqwi6l6y-fjkianis-projects.vercel.app/api/schedule/run-minute-scrape \
+  -H "Authorization: Bearer 56f52b6634a410679d99bd631000ae6782a786a71e21e3f2494a36adac0d8e3f"
+```
+
+## Schedule Integration
+
+### Market Hours Guard
+The endpoint automatically skips execution outside US market hours:
+```javascript
+// Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday
+const nowStr = new Date().toLocaleString('en-US', {
+  timeZone: 'America/New_York',
+  hour12: false,
+  weekday: 'short'
+});
+```
+
+### Supabase pg_cron Setup
+```sql
+-- Run every minute, endpoint self-guards market hours
+select cron.schedule(
+  'te-minute-scrape',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://backend-ekqwi6l6y-fjkianis-projects.vercel.app/api/schedule/run-minute-scrape',
+    headers := jsonb_build_object('Authorization', 'Bearer 56f52b6634a410679d99bd631000ae6782a786a71e21e3f2494a36adac0d8e3f'),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+## Debugging Commands
+
+### Environment Variable Management
+```bash
+# Add environment variable
+echo "VALUE" | npx vercel env add VAR_NAME production --cwd backend
+
+# List deployments
+npx vercel ls backend --cwd backend --prod
+
+# Get deployment logs
+npx vercel logs <deployment-url>
+```
+
+### Common Error Patterns
+1. **FUNCTION_INVOCATION_FAILED**: Check for missing dependencies, file system writes, or module import errors
+2. **404 on API routes**: Verify `vercel.json` configuration and handler export
+3. **Unauthorized on schedule**: Confirm `CRON_TOKEN` environment variable is set correctly
+
+## Key Learnings
+
+1. **Serverless Constraints**: No file system writes, no `process.exit()`, console-only logging
+2. **Dependency Management**: All imports must have corresponding installed packages
+3. **Environment Variables**: Need both Vercel env vars and proper code references
+4. **Export Pattern**: Must export default handler function for `@vercel/node`
+5. **Market Hours Logic**: Built into endpoint reduces external scheduling complexity
+
+## Success Metrics
+
+- ✅ Health endpoint returns 200 with service status
+- ✅ Schedule endpoint properly authenticates and guards market hours  
+- ✅ All environment variables detected and accessible
+- ✅ Function initializes without crashes
+- ✅ Ready for pg_cron integration
+
+This deployment now supports:
+- Automated news scraping during market hours
+- Redis-based state management and locking
+- Supabase article storage
+- Protected API endpoints with bearer token authentication
+description:
+globs:
+alwaysApply: false
+---
