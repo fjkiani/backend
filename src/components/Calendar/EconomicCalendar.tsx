@@ -167,6 +167,9 @@ export const EconomicCalendar: React.FC = () => {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
+                    if (response.status === 504 || response.status === 503) {
+                        throw new Error(`Service temporarily unavailable. The calendar service is experiencing high load. Please try again in a moment.`);
+                    }
                     throw new Error(`HTTP error! status: ${response.status} - ${errorData.error || response.statusText}`);
                 }
 

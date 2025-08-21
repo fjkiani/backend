@@ -115,6 +115,9 @@ export const EarningsCalendar: React.FC = () => {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
+                    if (response.status === 504 || response.status === 503) {
+                        throw new Error(`Earnings service temporarily unavailable. The API is experiencing high load. Please try again in a moment.`);
+                    }
                     throw new Error(`HTTP error! status: ${response.status} - ${errorData.error || response.statusText}`);
                 }
 
@@ -179,6 +182,9 @@ export const EarningsCalendar: React.FC = () => {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
                 console.error(`[Analyze] Error Response Data for ${event.symbol}:`, errorData);
+                if (response.status === 504 || response.status === 503) {
+                    throw new Error(`Analysis service temporarily unavailable. Please try again in a moment.`);
+                }
                 throw new Error(`HTTP error! status: ${response.status} - ${errorData.error || response.statusText}`);
             }
 
