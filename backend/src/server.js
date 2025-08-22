@@ -8,6 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load environment variables from .env file
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// Also try loading from root directory as fallback
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // --- Dotenv Debug --- 
@@ -26,6 +28,8 @@ process.env.VITE_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 process.env.VITE_DIFFBOT_TOKEN = 'a70dd1af6e654f5dbb12f3cd2d1406bb';
 process.env.REDIS_URL = 'redis://default:AcvYAAIjcDE2ZjFkNjg5MTE5ZWE0NWJkOWU1NjNiMjZkYWUyMjE0NXAxMA@shining-starfish-52184.upstash.io:6379';
 process.env.COHERE_API_KEY = 'SbVIWS96eV1fw0Fjv7EfeBGyhfxWQHSZr0PXjhYc';
+// Ensure CRON token is available in deployed env to authorize schedule routes
+process.env.CRON_TOKEN = process.env.CRON_TOKEN || '56f52b6634a410679d99bd631000ae6782a786a71e21e3f2494a36adac0d8e3f';
 
 // Also set non-VITE versions
 process.env.DB_URL = process.env.VITE_SUPABASE_URL;

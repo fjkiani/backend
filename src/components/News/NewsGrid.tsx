@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ProcessedArticle } from '../../services/news/types';
 import { NewsCard } from './NewsCard';
 import { Newspaper, Loader2, RefreshCw, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { config } from '../../config';
 
 interface NewsGridProps {
@@ -13,6 +13,7 @@ interface NewsGridProps {
 export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [logs, setLogs] = useState<{ level: string; message: string; timestamp: string }[]>([]);
+  const queryClient = useQueryClient();
   const [showLogs, setShowLogs] = useState(false);
 
   const { data: tradingEconomicsArticles, isLoading: isTradingEconomicsLoading, error: tradingEconomicsError, refetch } = useQuery({
@@ -24,7 +25,11 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
       }
       const data = await response.json();
       
-      return (data || []).map((article: any) => ({
+      // Filter for Trading Economics articles only
+      const teArticles = (data || []).filter((article: any) => article.source === 'Trading Economics');
+      console.log('Trading Economics articles found:', teArticles.length);
+      
+      return teArticles.map((article: any) => ({
         ...article,
         raw: {
           title: article.title,
@@ -49,7 +54,11 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
           confidence: 0
         }
       }));
-    }
+    },
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 0, // Don't cache results (React Query v5)
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
   });
 
   const handleRefresh = async () => {
@@ -98,8 +107,11 @@ export const NewsGrid: React.FC<NewsGridProps> = ({ articles, loading }) => {
         timestamp: new Date().toISOString()
       }]);
       
-      // Refetch the articles from Supabase after updates
-      await refetch();
+      // Wait a moment for backend processing, then clear cache and refetch
+      setTimeout(async () => {
+        await queryClient.invalidateQueries({ queryKey: ['articles'] });
+        await refetch();
+      }, 2000); // 2 second delay
     } catch (error: any) {
       console.error('Error refreshing news:', error);
       let errorMessage = 'Failed to refresh news. ';
