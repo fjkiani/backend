@@ -57,9 +57,9 @@ export class GoogleGenaiService {
     logger.debug('Built Gemini Synthesis Prompt:', { promptStart: prompt.substring(0, 300) + '...', promptLength: prompt.length });
 
     try {
-        // Add timeout wrapper - very close to Vercel limit for maximum speed
+        // Add timeout wrapper - optimized for Vercel limits
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Gemini API timeout after 9 seconds')), 9000)
+            setTimeout(() => reject(new Error('Gemini API timeout after 12 seconds')), 12000)
         );
 
         // Using generateContent for non-streaming
@@ -104,14 +104,28 @@ export class GoogleGenaiService {
       ).join('\n\n---\n\n');
     }
 
-    // Ultra-fast minimal prompt
-    return `Market analysis:
+    // Revised Prompt Instructions
+    return `You are a financial news analyst tasked with creating a concise market overview based *strictly* on the provided context below. Do not introduce external knowledge or make assumptions beyond what is stated in the input summaries.
 
-Themes: ${initialThemes || 'None'}
+Provided Context:
+1. Initial Themes from Headlines: ${initialThemes || 'Not available.'}
+2. Collection of Input Summaries:
+---
+${summaryContext}
+---
 
-Key points: ${summaryContext.replace(/\n/g, ' ')}
+Task: Analyze the Input Summaries and Initial Themes to generate a coherent market overview (approx. 5-7 sentences). Your analysis MUST focus on:
+- **Explicitly Mentioned Data:** Identify and report any specific economic indicators (e.g., inflation rate, GDP growth, index points changes), company names, or figures mentioned in the summaries. Quote the values if available.
+- **Stated Market Movers:** Describe the primary reasons *stated in the summaries* for market movements or sentiment (e.g., "The summary mentions rising yields...", "Trade tensions were cited as...").
+- **Sentiment Clues:** Identify the overall sentiment conveyed *by the summaries themselves* (e.g., cautious, optimistic, concerned about X).
+- **Conflicts & Gaps:** If summaries present conflicting information (e.g., positive data but negative sentiment description) or lack specific details (e.g., no figures provided), explicitly state this lack of information or conflict in your overview.
 
-Create 1-2 sentence overview:`;
+**Example of acknowledging missing info:** "While recession fears were mentioned, the provided summaries did not include specific data points supporting this."
+**Example of quoting data:** "The Dow Jones Index saw a significant gain, rising 619 points (1.56%) according to one summary."
+
+Generate the overview as a single block of text.
+
+Market Overview:`;
   }
 
   // --- Method for Earnings Trend Analysis (Now accepts trendData and overallContext) ---

@@ -12,7 +12,8 @@
     "test:simulate": "node tests/integration/webhook-simulator.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "railway:start": "node src/server.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
