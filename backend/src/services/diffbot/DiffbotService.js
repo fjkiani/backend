@@ -21,8 +21,10 @@ export class DiffbotService {
       const response = await axios.get(this.apiUrl, {
         params: {
           token: this.apiToken,
-          url: url
-        }
+          url: url,
+          render: 'true'
+        },
+        timeout: 20000
       });
       
       this.logger.info(`Successfully analyzed URL: ${url}`);

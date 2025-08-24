@@ -3,24 +3,18 @@ from bs4 import BeautifulSoup
 import json
 import os
 from datetime import datetime
-from dotenv import load_dotenv
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+import redis
 import time
 import sys
 
-# Load environment variables
-load_dotenv('/Users/fahadkiani/Desktop/development/backend/.env.local')
+# Load environment variables from system environment (works in all environments)
+# No need to load from specific .env file path - environment variables should be set in deployment
+DIFFBOT_TOKEN = os.getenv('DIFFBOT_TOKEN') or os.getenv('VITE_DIFFBOT_TOKEN')
 
 # Constants
 NEWS_URL = "https://tradingeconomics.com/stream?c=united+states"
-DATA_FILE = "last_news.json"
-DIFFBOT_TOKEN = os.getenv('DIFFBOT_TOKEN')
+# Use Redis for state management instead of local files
+DATA_KEY = "trading_economics_last_news"
 DIFFBOT_URL = f"https://api.diffbot.com/v3/analyze?token={DIFFBOT_TOKEN}"
 
 # Add token check
@@ -88,49 +82,101 @@ def get_top_news_item():
         if driver:
             driver.quit()
 
-def load_last_news():
-    """
-    Loads the previously saved news item
-    """
-    if not os.path.exists(DATA_FILE):
+def get_redis_client():
+    """Get Redis client for state management"""
+    redis_url = os.getenv('REDIS_URL')
+    if not redis_url:
         print(json.dumps({
-            'status': 'no_previous_data',
-            'file': DATA_FILE
+            'status': 'redis_error',
+            'error': 'REDIS_URL not found in environment variables'
         }))
-        return None, None
-        
+        return None
+
     try:
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            print(json.dumps({
-                'status': 'loaded_last_news',
-                'title': data.get('title'),
-                'timestamp': data.get('last_checked')
-            }))
-            return data.get('title'), data.get('url')
+        # Parse Redis URL
+        if redis_url.startswith('redis://'):
+            # Extract host, port, password from URL
+            # Format: redis://default:password@host:port
+            parts = redis_url.replace('redis://', '').split('@')
+            if len(parts) == 2:
+                auth_part = parts[0]
+                host_part = parts[1]
+
+                if ':' in auth_part:
+                    password = auth_part.split(':')[1]
+                else:
+                    password = auth_part
+
+                if ':' in host_part:
+                    host, port = host_part.split(':')
+                    port = int(port)
+                else:
+                    host = host_part
+                    port = 6379
+
+                return redis.Redis(host=host, port=port, password=password, decode_responses=True)
+            else:
+                return redis.from_url(redis_url, decode_responses=True)
+        else:
+            return redis.from_url(redis_url, decode_responses=True)
     except Exception as e:
         print(json.dumps({
-            'status': 'load_error',
+            'status': 'redis_connection_error',
+            'error': str(e)
+        }))
+        return None
+
+def load_last_news():
+    """
+    Loads the previously saved news item from Redis
+    """
+    try:
+        r = get_redis_client()
+        if not r:
+            return None, None
+
+        data = r.get(DATA_KEY)
+        if not data:
+            print(json.dumps({
+                'status': 'no_previous_data_redis',
+                'key': DATA_KEY
+            }))
+            return None, None
+
+        news_data = json.loads(data)
+        print(json.dumps({
+            'status': 'loaded_last_news_redis',
+            'title': news_data.get('title'),
+            'timestamp': news_data.get('last_checked')
+        }))
+        return news_data.get('title'), news_data.get('url')
+    except Exception as e:
+        print(json.dumps({
+            'status': 'load_error_redis',
             'error': str(e)
         }))
         return None, None
 
 def save_last_news(title, url):
     """
-    Saves the current news item
+    Saves the current news item to Redis
     """
     try:
-        with open(DATA_FILE, 'w', encoding='utf-8') as f:
-            data = {
-                'title': title, 
-                'url': url,
-                'last_checked': datetime.now().isoformat()
-            }
-            json.dump(data, f, indent=2)
-            print(json.dumps({
-                'status': 'saved_news',
-                'data': data
-            }))
+        r = get_redis_client()
+        if not r:
+            return
+
+        data = {
+            'title': title,
+            'url': url,
+            'last_checked': datetime.now().isoformat()
+        }
+
+        r.set(DATA_KEY, json.dumps(data))
+        print(json.dumps({
+            'status': 'saved_news_redis',
+            'data': data
+        }))
     except Exception as e:
         print(json.dumps({
             'status': 'save_error',

@@ -42,14 +42,18 @@ export class EarningsCalendarService {
         const cacheKey = `earnings:fmp:calendar:${from}:${to}`;
 
         // 1. Check Cache
-        try {
-            const cachedData = await redis.get(cacheKey);
-            if (cachedData) {
-                logger.info('FMP EarningsCalendarService (Calendar): Cache HIT', { key: cacheKey });
-                return JSON.parse(cachedData);
+        if (redis) {
+            try {
+                const cachedData = await redis.get(cacheKey);
+                if (cachedData) {
+                    logger.info('FMP EarningsCalendarService (Calendar): Cache HIT', { key: cacheKey });
+                    return JSON.parse(cachedData);
+                }
+            } catch (cacheError) {
+                logger.error('FMP EarningsCalendarService (Calendar): Redis GET error', { key: cacheKey, error: cacheError });
             }
-        } catch (cacheError) {
-            logger.error('FMP EarningsCalendarService (Calendar): Redis GET error', { key: cacheKey, error: cacheError });
+        } else {
+            logger.debug('FMP EarningsCalendarService (Calendar): Redis not available, skipping cache');
         }
         
         logger.info('FMP EarningsCalendarService (Calendar): Cache MISS, fetching from API', { key: cacheKey });
@@ -85,13 +89,17 @@ export class EarningsCalendarService {
             const earnings = response.data;
             logger.info(`FMP EarningsCalendarService (Calendar): Successfully fetched ${earnings.length} events.`);
             
-            // 3. Store in Cache
-            try {
-                const cacheDuration = earnings.length > 0 ? EARNINGS_CACHE_DURATION_SECONDS : 600; 
-                await redis.set(cacheKey, JSON.stringify(earnings), 'EX', cacheDuration); 
-                logger.info(`FMP EarningsCalendarService (Calendar): Result stored in cache.`, { key: cacheKey });
-            } catch (cacheSetError) {
-                 logger.error('FMP EarningsCalendarService (Calendar): Redis SET error', { key: cacheKey, error: cacheSetError });
+                        // 3. Store in Cache
+            if (redis) {
+                try {
+                    const cacheDuration = earnings.length > 0 ? EARNINGS_CACHE_DURATION_SECONDS : 600;
+                    await redis.set(cacheKey, JSON.stringify(earnings), 'EX', cacheDuration);
+                    logger.info(`FMP EarningsCalendarService (Calendar): Result stored in cache.`, { key: cacheKey });
+                } catch (cacheSetError) {
+                    logger.error('FMP EarningsCalendarService (Calendar): Redis SET error', { key: cacheKey, error: cacheSetError });
+                }
+            } else {
+                logger.debug('FMP EarningsCalendarService (Calendar): Redis not available, skipping cache storage');
             }
             
             return earnings; 
@@ -128,14 +136,18 @@ export class EarningsCalendarService {
         const cacheKey = `earnings:mboum:history:${symbol}`;
 
         // 1. Check Cache
-        try {
-            const cachedData = await redis.get(cacheKey);
-            if (cachedData) {
-                logger.info('Mboum Earnings Service (History): Cache HIT', { key: cacheKey, symbol });
-                return JSON.parse(cachedData);
+        if (redis) {
+            try {
+                const cachedData = await redis.get(cacheKey);
+                if (cachedData) {
+                    logger.info('Mboum Earnings Service (History): Cache HIT', { key: cacheKey, symbol });
+                    return JSON.parse(cachedData);
+                }
+            } catch (cacheError) {
+                logger.error('Mboum Earnings Service (History): Redis GET error', { key: cacheKey, symbol, error: cacheError });
             }
-        } catch (cacheError) {
-            logger.error('Mboum Earnings Service (History): Redis GET error', { key: cacheKey, symbol, error: cacheError });
+        } else {
+            logger.debug('Mboum Earnings Service (History): Redis not available, skipping cache');
         }
 
         logger.info('Mboum Earnings Service (History): Cache MISS, fetching from API', { key: cacheKey, symbol });
@@ -194,12 +206,16 @@ export class EarningsCalendarService {
             logger.info(`Mboum Earnings Service (History): Successfully fetched and mapped ${mappedHistoricalEarnings.length} historical records for ${symbol}.`);
 
             // 3. Store Mapped Data in Cache
-            try {
-                const cacheDuration = mappedHistoricalEarnings.length > 0 ? HISTORICAL_CACHE_DURATION_SECONDS : 600;
-                await redis.set(cacheKey, JSON.stringify(mappedHistoricalEarnings), 'EX', cacheDuration);
-                logger.info(`Mboum Earnings Service (History): Result stored in cache for ${symbol}.`, { key: cacheKey });
-            } catch (cacheSetError) {
-                logger.error('Mboum Earnings Service (History): Redis SET error', { key: cacheKey, symbol, error: cacheSetError });
+            if (redis) {
+                try {
+                    const cacheDuration = mappedHistoricalEarnings.length > 0 ? HISTORICAL_CACHE_DURATION_SECONDS : 600;
+                    await redis.set(cacheKey, JSON.stringify(mappedHistoricalEarnings), 'EX', cacheDuration);
+                    logger.info(`Mboum Earnings Service (History): Result stored in cache for ${symbol}.`, { key: cacheKey });
+                } catch (cacheSetError) {
+                    logger.error('Mboum Earnings Service (History): Redis SET error', { key: cacheKey, symbol, error: cacheSetError });
+                }
+            } else {
+                logger.debug('Mboum Earnings Service (History): Redis not available, skipping cache storage');
             }
 
             return mappedHistoricalEarnings;
@@ -236,14 +252,18 @@ export class EarningsCalendarService {
         const cacheKey = `earnings:mboum:trend:${symbol}`;
 
         // 1. Check Cache
-        try {
-            const cachedData = await redis.get(cacheKey);
-            if (cachedData) {
-                logger.info('Mboum Earnings Service (Trend): Cache HIT', { key: cacheKey, symbol });
-                return JSON.parse(cachedData);
+        if (redis) {
+            try {
+                const cachedData = await redis.get(cacheKey);
+                if (cachedData) {
+                    logger.info('Mboum Earnings Service (Trend): Cache HIT', { key: cacheKey, symbol });
+                    return JSON.parse(cachedData);
+                }
+            } catch (cacheError) {
+                logger.error('Mboum Earnings Service (Trend): Redis GET error', { key: cacheKey, symbol, error: cacheError });
             }
-        } catch (cacheError) {
-            logger.error('Mboum Earnings Service (Trend): Redis GET error', { key: cacheKey, symbol, error: cacheError });
+        } else {
+            logger.debug('Mboum Earnings Service (Trend): Redis not available, skipping cache');
         }
 
         logger.info('Mboum Earnings Service (Trend): Cache MISS, fetching from API', { key: cacheKey, symbol });
@@ -287,13 +307,17 @@ export class EarningsCalendarService {
             logger.info(`Mboum Earnings Service (Trend): Successfully fetched ${trendData.length} trend periods for ${symbol}.`);
 
             // 3. Store Trend Data in Cache
-            try {
-                 // Cache even empty results briefly if API returned valid structure but empty array
-                 const cacheDuration = trendData.length > 0 ? HISTORICAL_CACHE_DURATION_SECONDS : 600; 
-                 await redis.set(cacheKey, JSON.stringify(trendData), 'EX', cacheDuration);
-                 logger.info(`Mboum Earnings Service (Trend): Result stored in cache for ${symbol}.`, { key: cacheKey });
-            } catch (cacheSetError) {
-                 logger.error('Mboum Earnings Service (Trend): Redis SET error', { key: cacheKey, symbol, error: cacheSetError });
+            if (redis) {
+                try {
+                     // Cache even empty results briefly if API returned valid structure but empty array
+                     const cacheDuration = trendData.length > 0 ? HISTORICAL_CACHE_DURATION_SECONDS : 600;
+                     await redis.set(cacheKey, JSON.stringify(trendData), 'EX', cacheDuration);
+                     logger.info(`Mboum Earnings Service (Trend): Result stored in cache for ${symbol}.`, { key: cacheKey });
+                } catch (cacheSetError) {
+                     logger.error('Mboum Earnings Service (Trend): Redis SET error', { key: cacheKey, symbol, error: cacheSetError });
+                }
+            } else {
+                logger.debug('Mboum Earnings Service (Trend): Redis not available, skipping cache storage');
             }
 
             return trendData; // Return the raw trend array

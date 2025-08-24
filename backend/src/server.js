@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import path from 'path';
-import { NewsScheduler } from './services/news/scheduler.mjs';
+import { NewsScheduler } from './services/news/scheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,19 +22,15 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 // }
 // --- End Dotenv Debug ---
 
-// Manually set environment variables
-process.env.VITE_SUPABASE_URL = 'https://gpirjathvfoqjurjhdxq.supabase.co';
-process.env.VITE_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwaXJqYXRodmZvcWp1cmpoZHhxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNDU3MTExMywiZXhwIjoyMDUwMTQ3MTEzfQ.M3ST5Hjqe8lOvwYdrnAQdS8YGHUB9zsOTOy-izK0bt0';
-process.env.VITE_DIFFBOT_TOKEN = 'a70dd1af6e654f5dbb12f3cd2d1406bb';
-process.env.REDIS_URL = 'redis://default:AcvYAAIjcDE2ZjFkNjg5MTE5ZWE0NWJkOWU1NjNiMjZkYWUyMjE0NXAxMA@shining-starfish-52184.upstash.io:6379';
-process.env.COHERE_API_KEY = 'SbVIWS96eV1fw0Fjv7EfeBGyhfxWQHSZr0PXjhYc';
-// Ensure CRON token is available in deployed env to authorize schedule routes
+// Environment variables are loaded from .env file above
+// Set fallback values for deployed environments
 process.env.CRON_TOKEN = process.env.CRON_TOKEN || '56f52b6634a410679d99bd631000ae6782a786a71e21e3f2494a36adac0d8e3f';
 
-// Also set non-VITE versions
-process.env.DB_URL = process.env.VITE_SUPABASE_URL;
-process.env.SERVICE_KEY = process.env.VITE_SUPABASE_KEY;
-process.env.DIFFBOT_TOKEN = process.env.VITE_DIFFBOT_TOKEN;
+// Set non-VITE versions for consistency
+process.env.DB_URL = process.env.DB_URL || process.env.VITE_SUPABASE_URL;
+process.env.SERVICE_KEY = process.env.SERVICE_KEY || process.env.VITE_SUPABASE_KEY;
+process.env.DIFFBOT_TOKEN = process.env.DIFFBOT_TOKEN || process.env.VITE_DIFFBOT_TOKEN;
+process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 // Debug environment loading
 // console.log('Environment loaded:', {
@@ -59,13 +55,14 @@ process.env.DIFFBOT_TOKEN = process.env.VITE_DIFFBOT_TOKEN;
 // Now import the rest of the modules
 import express from 'express';
 import cors from 'cors';
-import { scrapeNews } from './scraper.js';
+// Note: Avoid static import of scraper in serverless to prevent import-time failures
+// We will dynamically import it inside the route handler when needed
 import logger from './logger.js';
 import config from './config.js';
 import { initializeRoutes as initNewsRoutes } from './routes/news.js';
 import analysisRoutes from './routes/analysis.js';
 import axios from 'axios';
-import { SupabaseStorage } from './services/storage/supabase/supabaseStorage.js';
+// Removed static import - will be imported dynamically to avoid cold start issues
 import realTimeNewsRoutes from './routes/realTimeNewsRoutes.js';
 import diffbotRoutes from './routes/diffbotRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
@@ -74,9 +71,6 @@ import scheduleRoutes from './routes/scheduleRoutes.js';
 
 const app = express();
 let scheduler;
-if (!process.env.VERCEL) {
-  scheduler = new NewsScheduler();
-}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -91,23 +85,29 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Initialize SupabaseStorage first
+// Initialize services lazily to avoid cold start issues in Vercel
 let storage;
-try {
-  storage = new SupabaseStorage();
-  logger.info('SupabaseStorage initialized successfully');
-  
-  // Start the scheduler only in non-Vercel environments
-  if (scheduler) {
-    scheduler.start();
-    logger.info('News scheduler started');
+
+// Lazy initialization function
+async function getStorage() {
+  if (!storage) {
+    try {
+      const { SupabaseStorage } = await import('./services/storage/supabase/supabaseStorage.js');
+      storage = new SupabaseStorage();
+      logger.info('SupabaseStorage initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize SupabaseStorage:', error);
+      throw error;
+    }
   }
-} catch (error) {
-  logger.error('Failed to initialize services:', error);
-  // Don't exit in Vercel - just log and continue
-  if (!process.env.VERCEL) {
-    process.exit(1);
-  }
+  return storage;
+}
+
+// Start the scheduler only in non-Vercel environments
+if (!process.env.VERCEL) {
+  scheduler = new NewsScheduler();
+  scheduler.start();
+  logger.info('News scheduler started');
 }
 
 // Configure CORS
@@ -120,8 +120,8 @@ app.use(cors({
 // Add body parser for JSON
 app.use(express.json());
 
-// Initialize routes with storage instance
-const newsRouter = initNewsRoutes(storage);
+// Initialize routes - storage will be initialized lazily inside route handlers
+const newsRouter = initNewsRoutes(null); // Pass null, routes will get storage when needed
 app.use('/api/news', newsRouter);
 
 // Add analysis routes
@@ -151,6 +151,8 @@ app.get('/api/scrape/trading-economics', async (req, res) => {
     });
 
     const forceFresh = req.query.fresh === 'true';
+    // Dynamically import scraper to avoid cold-start import issues
+    const { scrapeNews } = await import('./scraper.js');
     const articles = await scrapeNews(forceFresh);
     
     logger.info('Scraped articles:', {
@@ -160,9 +162,10 @@ app.get('/api/scrape/trading-economics', async (req, res) => {
     });
 
     // Store scraped articles in Supabase
+    const storageInstance = await getStorage();
     for (const article of articles) {
       try {
-        await storage.storeArticle(article);
+        await storageInstance.storeArticle(article);
         logger.info('Stored article:', {
           title: article.title,
           created_at: article.created_at,
@@ -231,10 +234,10 @@ app.get('/api/test-diffbot', async (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
-    // Keep this one for confirmation the server started
-    console.log(`Server running on port ${PORT}`);
-  });
+app.listen(PORT, () => {
+  // Keep this one for confirmation the server started
+  console.log(`Server running on port ${PORT}`);
+});
 }
 export default function handler(req, res) {
   return app(req, res);

@@ -1,12 +1,10 @@
 import express from 'express';
 import logger from '../logger.js';
-import { scrapeNews } from '../scraper.js';
-import { SupabaseStorage } from '../services/storage/supabase/supabaseStorage.js';
-import { getRedisClient } from '../services/redis/redisClient.js';
+// Lazy import storage and redis inside handlers to avoid cold-start issues
 
 const router = express.Router();
-const storage = new SupabaseStorage();
-const redis = getRedisClient();
+let storage;
+let redis;
 
 function isWithinMarketHoursEastern() {
 	// Compute current time in America/New_York without external deps
@@ -39,6 +37,10 @@ function isWithinMarketHoursEastern() {
 
 async function acquireLock(key, ttlSeconds) {
 	try {
+		if (!redis) {
+			const { getRedisClient } = await import('../services/redis/redisClient.js');
+			redis = getRedisClient();
+		}
 		const result = await redis.set(key, '1', 'NX', 'EX', ttlSeconds);
 		return result === 'OK';
 	} catch (error) {
@@ -49,6 +51,10 @@ async function acquireLock(key, ttlSeconds) {
 
 async function releaseLock(key) {
 	try {
+		if (!redis) {
+			const { getRedisClient } = await import('../services/redis/redisClient.js');
+			redis = getRedisClient();
+		}
 		await redis.del(key);
 	} catch (error) {
 		logger.error('Failed to release Redis lock', { error: error.message });
@@ -84,13 +90,15 @@ router.post('/run-minute-scrape', async (req, res) => {
 
 		logger.info('Scrape triggered', { frequency, isMarketHours });
 		
-		// Run scraping with appropriate intensity
-		// During market hours: fresh data more important
-		// Outside market hours: can use cached/less frequent updates
 		const forceFresh = isMarketHours;
+ 		const { scrapeNews } = await import('../scraper.js');
 		const articles = await scrapeNews(forceFresh);
 
 		if (Array.isArray(articles) && articles.length > 0) {
+			if (!storage) {
+				const { SupabaseStorage } = await import('../services/storage/supabase/supabaseStorage.js');
+				storage = new SupabaseStorage();
+			}
 			await storage.storeArticles(articles);
 			logger.info('Stored articles from scheduled scrape', {
 				count: articles.length,
@@ -134,10 +142,17 @@ router.post('/trigger-te-scrape', async (req, res) => {
 				const articles = await scrapeNews(true); // force fresh
 				
 				if (Array.isArray(articles) && articles.length > 0) {
+					if (!storage) {
+						const { SupabaseStorage } = await import('../services/storage/supabase/supabaseStorage.js');
+						storage = new SupabaseStorage();
+					}
+					await storage.storeArticles(articles);
 					logger.info('Background scrape completed', {
 						count: articles.length,
 						firstTitle: articles[0]?.title
 					});
+				} else {
+					logger.info('Background scrape returned no articles');
 				}
 			} catch (error) {
 				logger.error('Background scrape error', { error: error.message });

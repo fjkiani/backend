@@ -2,15 +2,14 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import logger from '../../logger.js';
 
 // --- Constants ---
-// Switch to Pro model for deeper analysis tasks
-// const GEMINI_MODEL_NAME = "gemini-1.5-pro-latest"; 
-// const GEMINI_MODEL_NAME = "gemini-2.0-flash-thinking-exp-01-21"; 
-const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17"; // User requested experimental model
-// const GEMINI_MODEL_NAME = "gemini-1.5-flash-latest"; // Use standard Flash model
-const MAX_OUTPUT_TOKENS = 2048; // Increased for Pro model, should be fine for experimental flash
-const TEMPERATURE = 0.4; // Similar to Cohere setting
-const TOP_P = 1;
-const TOP_K = 1;
+// Switching back to Flash model - reliable and working
+// const GEMINI_MODEL_NAME = "gemini-2.5-pro"; // Pro model - access issues
+const GEMINI_MODEL_NAME = "gemini-1.5-flash-latest"; // Stable Flash model - reliable
+// const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17"; // Experimental - unstable
+const MAX_OUTPUT_TOKENS = 512; // Very short for fast responses
+const TEMPERATURE = 0.1; // Very low for consistent, fast responses
+const TOP_P = 0.5;
+const TOP_K = 10;
 
 export class GoogleGenaiService {
   genAI;
@@ -58,13 +57,20 @@ export class GoogleGenaiService {
     logger.debug('Built Gemini Synthesis Prompt:', { promptStart: prompt.substring(0, 300) + '...', promptLength: prompt.length });
 
     try {
+        // Add timeout wrapper - very close to Vercel limit for maximum speed
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini API timeout after 9 seconds')), 9000)
+        );
+
         // Using generateContent for non-streaming
-        const result = await this.model.generateContent(prompt);
+        const geminiPromise = this.model.generateContent(prompt);
+
+        const result = await Promise.race([geminiPromise, timeoutPromise]);
         const response = result.response;
         const rawText = response.text();
         logger.debug('Raw response text from Gemini:', { rawText });
         const synthesis = rawText.trim();
-        
+
         logger.info('Google Gemini market overview synthesis successful.');
         return synthesis;
 
@@ -76,7 +82,12 @@ export class GoogleGenaiService {
         // Attempt to log specific details from the API response if present
         details: error.response?.data?.error?.message || error.response?.data || error.details
       });
-      return 'Error generating market overview via Gemini.'; // Return specific error message
+
+      // Return a fallback response using the initial themes
+      if (initialThemes) {
+        return `Market Overview: ${initialThemes} (Gemini processing timed out, showing initial analysis)`;
+      }
+      return 'Market analysis temporarily unavailable. The AI service is experiencing high load. Please try again in a moment.';
     }
   }
 
@@ -93,28 +104,14 @@ export class GoogleGenaiService {
       ).join('\n\n---\n\n');
     }
 
-    // Revised Prompt Instructions
-    return `You are a financial news analyst tasked with creating a concise market overview based *strictly* on the provided context below. Do not introduce external knowledge or make assumptions beyond what is stated in the input summaries.
+    // Ultra-fast minimal prompt
+    return `Market analysis:
 
-Provided Context:
-1. Initial Themes from Headlines: ${initialThemes || 'Not available.'}
-2. Collection of Input Summaries:
----
-${summaryContext}
----
+Themes: ${initialThemes || 'None'}
 
-Task: Analyze the Input Summaries and Initial Themes to generate a coherent market overview (approx. 5-7 sentences). Your analysis MUST focus on:
-- **Explicitly Mentioned Data:** Identify and report any specific economic indicators (e.g., inflation rate, GDP growth, index points changes), company names, or figures mentioned in the summaries. Quote the values if available.
-- **Stated Market Movers:** Describe the primary reasons *stated in the summaries* for market movements or sentiment (e.g., "The summary mentions rising yields...", "Trade tensions were cited as...").
-- **Sentiment Clues:** Identify the overall sentiment conveyed *by the summaries themselves* (e.g., cautious, optimistic, concerned about X).
-- **Conflicts & Gaps:** If summaries present conflicting information (e.g., positive data but negative sentiment description) or lack specific details (e.g., no figures provided), explicitly state this lack of information or conflict in your overview.
+Key points: ${summaryContext.replace(/\n/g, ' ')}
 
-**Example of acknowledging missing info:** "While recession fears were mentioned, the provided summaries did not include specific data points supporting this."
-**Example of quoting data:** "The Dow Jones Index saw a significant gain, rising 619 points (1.56%) according to one summary."
-
-Generate the overview as a single block of text.
-
-Market Overview:`;
+Create 1-2 sentence overview:`;
   }
 
   // --- Method for Earnings Trend Analysis (Now accepts trendData and overallContext) ---

@@ -33,14 +33,18 @@ export class EconomicCalendarService {
     async fetchEvents(startDate, countries = ['US']) { // countries param can be removed or ignored if hardcoding to US
         const cacheKey = `calendar_v2:events:US:${startDate}`; // Add US to cache key for clarity
 
-        try {
-            const cachedData = await redis.get(cacheKey);
-            if (cachedData) {
-                logger.info('EconomicCalendarService (v2): Cache HIT for US events', { key: cacheKey });
-                return JSON.parse(cachedData);
+        if (redis) {
+            try {
+                const cachedData = await redis.get(cacheKey);
+                if (cachedData) {
+                    logger.info('EconomicCalendarService (v2): Cache HIT for US events', { key: cacheKey });
+                    return JSON.parse(cachedData);
+                }
+            } catch (cacheError) {
+                logger.error('EconomicCalendarService (v2): Redis GET error for US events', { key: cacheKey, error: cacheError });
             }
-        } catch (cacheError) {
-            logger.error('EconomicCalendarService (v2): Redis GET error for US events', { key: cacheKey, error: cacheError });
+        } else {
+            logger.debug('EconomicCalendarService (v2): Redis not available, skipping cache');
         }
         
         logger.info('EconomicCalendarService (v2): Cache MISS for US events, fetching from API', { key: cacheKey, date: startDate });
@@ -112,9 +116,17 @@ export class EconomicCalendarService {
                 logger.info('EconomicCalendarService (v2): Using shorter cache duration (15 min) for current/recent US data.', { key: cacheKey });
             }
 
-            if (usEvents.length > 0) { 
-                await redis.set(cacheKey, JSON.stringify(usEvents), 'EX', cacheDurationInSeconds); 
-                logger.info('EconomicCalendarService (v2): US events stored in cache', { key: cacheKey, duration: cacheDurationInSeconds });
+            if (usEvents.length > 0) {
+                if (redis) {
+                    try {
+                        await redis.set(cacheKey, JSON.stringify(usEvents), 'EX', cacheDurationInSeconds);
+                        logger.info('EconomicCalendarService (v2): US events stored in cache', { key: cacheKey, duration: cacheDurationInSeconds });
+                    } catch (cacheError) {
+                        logger.error('EconomicCalendarService (v2): Redis SET error for US events', { key: cacheKey, error: cacheError });
+                    }
+                } else {
+                    logger.debug('EconomicCalendarService (v2): Redis not available, skipping cache storage');
+                }
             } else {
                 logger.info('EconomicCalendarService (v2): No US events found for this date, not caching.', { key: cacheKey });
             }
