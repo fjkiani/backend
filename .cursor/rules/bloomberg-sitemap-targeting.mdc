@@ -1,0 +1,61 @@
+---
+description: "Bloomberg sitemaps map and precise targeting guide for Zeta Atlas"
+---
+
+## Bloomberg Sitemap Targeting Guide
+
+Use these sitemaps to locate high-signal content quickly without scanning the entire site. Combine with the Cartographer agent to pre-filter aggressively.
+
+### Primary Sitemaps
+- **News (freshest articles)**: `https://www.bloomberg.com/sitemaps/news/latest.xml`
+  - Fields: `loc`, `lastmod`, `news:title`, `news:publication_date`
+  - Best for: day-of moves, week-of catalysts
+
+- **News (archive by month)**: `https://www.bloomberg.com/sitemaps/news/index.xml` → shards `.../news/YYYY-MM.xml`
+  - Best for: historical backfill on specific themes/tickers
+
+- **Collections (section fronts)**: `https://www.bloomberg.com/sitemaps/collections/index.xml`
+  - Shards: `homepages.xml`, `sectionfronts.xml`, `standalone.xml`
+  - Best for: curated landing pages to fan out from sections (e.g., Markets, Technology)
+
+- **Companies**: Public `https://www.bloomberg.com/sitemaps/companies/public-company/index.xml` | Private `https://www.bloomberg.com/sitemaps/companies/private-company/index.xml`
+  - Best for: company registry, linking names to canonical pages
+
+- **Securities (quotes/tickers)**: `https://www.bloomberg.com/sitemaps/securities/index.xml`
+  - Best for: mapping tickers to `/quote/<SYMBOL:REGION>` pages used in targeting
+
+- **Media (optional)**: Video `https://www.bloomberg.com/sitemaps/media/video/index.xml` | Audio `https://www.bloomberg.com/sitemaps/media/audio/index.xml`
+
+### Targeting Strategy (Pre-filter Before LLM)
+Use the Cartographer agent to pre-filter URLs by:
+- include keywords (e.g., `earnings, guidance, downgrade, fed, cpi, payroll`)
+- exclude keywords (e.g., `politics, opinion, lifestyle`)
+- tickers (lowercased; matches URL paths)
+- since-days (uses `lastmod` when present)
+- limit (caps processing volume)
+
+Cartographer implementation: [zeta_agents/13_cartographer_agent.js](mdc:zeta_agents/13_cartographer_agent.js)
+
+### Example Commands
+- Latest NVDA earnings (last 7 days, max 10):
+```bash
+./zeta_agents/13_cartographer_agent.js https://www.bloomberg.com/sitemaps/news/latest.xml --include=earnings,results,guidance --tickers=nvda --since-days=7 --limit=10
+```
+
+- Macro (Fed + labor), exclude politics (last 14 days, max 25):
+```bash
+./zeta_agents/13_cartographer_agent.js https://www.bloomberg.com/sitemaps/news/latest.xml --include=fed,fomc,rate,cpi,pce,gdp,payroll --exclude=politics,opinion --since-days=14 --limit=25
+```
+
+- Analyst actions for AAPL/MSFT (max 20):
+```bash
+./zeta_agents/13_cartographer_agent.js https://www.bloomberg.com/sitemaps/news/latest.xml --include=analyst,upgrade,downgrade,"price-target" --tickers=aapl,msft --since-days=10 --limit=20
+```
+
+### When to Use Which Sitemap
+- “What moved today/this week?” → `news/latest.xml`
+- “Backfill last month’s earnings on specific names” → `news/YYYY-MM.xml`
+- “Build ticker map for targets” → `securities/index.xml` shards
+- “Entity dictionaries (execs/policymakers)” → `people/profiles` shards
+- “Section-driven monitoring” → `collections/sectionfronts.xml`
+

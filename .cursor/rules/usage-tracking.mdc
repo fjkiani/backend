@@ -1,0 +1,777 @@
+---
+globs: backend/src/services/usage/*.js,backend/src/middleware/rateLimiter.js,src/hooks/useUsage.ts,src/components/Usage/*.tsx
+description: Usage tracking and rate limiting patterns for SaaS
+---
+
+# Usage Tracking and Rate Limiting Patterns for SaaS
+
+This rule provides guidance for implementing comprehensive usage tracking, rate limiting, and quota management in the SaaS platform.
+
+## Usage Tracking Service
+
+### 1. Core Usage Tracking Service
+
+```javascript
+// backend/src/services/usage/UsageTrackingService.js
+import logger from '../../logger.js';
+
+export class UsageTrackingService {
+  constructor(supabase) {
+    this.supabase = supabase;
+  }
+
+  // Check user quota before processing request
+  async checkUserQuota(userId, queryType = 'llm') {
+    try {
+      const { data: profile, error } = await this.supabase
+        .from('user_profiles')
+        .select('query_count, query_limit, subscription_tier')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        logger.error('Error checking user quota:', error);
+        throw error;
+      }
+
+      const canProceed = profile.query_count < profile.query_limit;
+      const remaining = Math.max(0, profile.query_limit - profile.query_count);
+
+      return {
+        canProceed,
+        remaining,
+        currentUsage: profile.query_count,
+        limit: profile.query_limit,
+        tier: profile.subscription_tier,
+        usagePercentage: (profile.query_count / profile.query_limit) * 100
+      };
+    } catch (error) {
+      logger.error('Error in checkUserQuota:', error);
+      throw error;
+    }
+  }
+
+  // Track usage after successful operation
+  async trackUsage(userId, usageData) {
+    try {
+      const {
+        queryType = 'llm',
+        querySubtype = null,
+        tokensUsed = 0,
+        creditsUsed = 1,
+        cost = 0,
+        metadata = {}
+      } = usageData;
+
+      // Insert usage record
+      const { data: usageRecord, error: usageError } = await this.supabase
+        .from('user_usage')
+        .insert({
+          user_id: userId,
+          query_type: queryType,
+          query_subtype: querySubtype,
+          tokens_used: tokensUsed,
+          credits_used: creditsUsed,
+          cost: cost,
+          metadata: metadata
+        })
+        .select()
+        .single();
+
+      if (usageError) {
+        logger.error('Error inserting usage record:', usageError);
+        throw usageError;
+      }
+
+      // Update user profile usage count
+      const { error: updateError } = await this.supabase.rpc('increment_user_query_count', {
+        user_id: userId
+      });
+
+      if (updateError) {
+        logger.error('Error updating user query count:', updateError);
+        throw updateError;
+      }
+
+      // Update usage summary for quick checks
+      await this.updateUsageSummary(userId, queryType, creditsUsed);
+
+      logger.info('Usage tracked successfully:', {
+        userId,
+        queryType,
+        creditsUsed,
+        usageRecordId: usageRecord.id
+      });
+
+      return usageRecord;
+    } catch (error) {
+      logger.error('Error in trackUsage:', error);
+      throw error;
+    }
+  }
+
+  // Update usage summary table
+  async updateUsageSummary(userId, queryType, creditsUsed) {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      // Get or create usage summary for today
+      const { data: existing } = await this.supabase
+        .from('user_usage_summary')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('period_start', today)
+        .single();
+
+      if (existing) {
+        // Update existing record
+        const updates = {
+          total_queries: existing.total_queries + creditsUsed
+        };
+
+        if (queryType === 'llm') {
+          updates.llm_queries = existing.llm_queries + creditsUsed;
+        }
+
+        await this.supabase
+          .from('user_usage_summary')
+          .update(updates)
+          .eq('user_id', userId)
+          .eq('period_start', today);
+      } else {
+        // Create new record
+        await this.supabase
+          .from('user_usage_summary')
+          .insert({
+            user_id: userId,
+            total_queries: creditsUsed,
+            llm_queries: queryType === 'llm' ? creditsUsed : 0,
+            period_start: today
+          });
+      }
+    } catch (error) {
+      logger.error('Error updating usage summary:', error);
+      // Don't throw - this is not critical
+    }
+  }
+
+  // Get usage history for user
+  async getUsageHistory(userId, timeframe = '30 days') {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(timeframe.split(' ')[0]));
+
+      const { data, error } = await this.supabase
+        .from('user_usage')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('timestamp', startDate.toISOString())
+        .order('timestamp', { ascending: false });
+
+      if (error) {
+        logger.error('Error fetching usage history:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      logger.error('Error in getUsageHistory:', error);
+      throw error;
+    }
+  }
+
+  // Get usage statistics
+  async getUsageStats(userId) {
+    try {
+      const { data: profile } = await this.supabase
+        .from('user_profiles')
+        .select('query_count, query_limit, subscription_tier')
+        .eq('id', userId)
+        .single();
+
+      const { data: todayUsage } = await this.supabase
+        .from('user_usage_summary')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('period_start', new Date().toISOString().split('T')[0])
+        .single();
+
+      return {
+        currentUsage: profile.query_count,
+        limit: profile.query_limit,
+        remaining: profile.query_limit - profile.query_count,
+        tier: profile.subscription_tier,
+        usagePercentage: (profile.query_count / profile.query_limit) * 100,
+        todayQueries: todayUsage?.total_queries || 0,
+        todayLLMQueries: todayUsage?.llm_queries || 0
+      };
+    } catch (error) {
+      logger.error('Error in getUsageStats:', error);
+      throw error;
+    }
+  }
+
+  // Reset usage (for monthly resets or admin actions)
+  async resetUsage(userId, resetType = 'monthly') {
+    try {
+      const { error } = await this.supabase
+        .from('user_profiles')
+        .update({
+          query_count: 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (error) {
+        logger.error('Error resetting usage:', error);
+        throw error;
+      }
+
+      // Log the reset
+      await this.supabase
+        .from('user_usage')
+        .insert({
+          user_id: userId,
+          query_type: 'system',
+          metadata: { action: 'usage_reset', resetType }
+        });
+
+      logger.info('Usage reset successfully:', { userId, resetType });
+    } catch (error) {
+      logger.error('Error in resetUsage:', error);
+      throw error;
+    }
+  }
+}
+```
+
+### 2. Rate Limiting Middleware
+
+```javascript
+// backend/src/middleware/rateLimiter.js
+import { UsageTrackingService } from '../services/usage/UsageTrackingService.js';
+import logger from '../logger.js';
+
+export const checkUsageLimit = (queryType = 'llm', credits = 1) => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return next(); // Let auth middleware handle this
+    }
+
+    try {
+      const usageService = new UsageTrackingService(req.supabase);
+      const quota = await usageService.checkUserQuota(req.user.id, queryType);
+
+      if (!quota.canProceed) {
+        logger.warn('Usage limit exceeded:', {
+          userId: req.user.id,
+          queryType,
+          currentUsage: quota.currentUsage,
+          limit: quota.limit
+        });
+
+        return res.status(429).json({
+          error: 'Usage limit exceeded',
+          message: `You have used ${quota.currentUsage} of ${quota.limit} queries`,
+          remaining: 0,
+          resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+          upgradeUrl: '/subscription/upgrade',
+          tier: quota.tier,
+          usagePercentage: quota.usagePercentage
+        });
+      }
+
+      // Attach usage info to request for later use
+      req.usageInfo = {
+        currentUsage: quota.currentUsage,
+        limit: quota.limit,
+        remaining: quota.remaining,
+        tier: quota.tier,
+        usagePercentage: quota.usagePercentage,
+        willExceed: (quota.currentUsage + credits) > quota.limit
+      };
+
+      // Add usage tracking helper to request
+      req.trackUsage = async (usageData) => {
+        return await usageService.trackUsage(req.user.id, {
+          queryType,
+          creditsUsed: credits,
+          ...usageData
+        });
+      };
+
+      next();
+    } catch (error) {
+      logger.error('Rate limiter error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  };
+};
+
+// Specialized middleware for different endpoints
+export const llmRateLimit = checkUsageLimit('llm', 1);
+export const analysisRateLimit = checkUsageLimit('analysis', 1);
+export const calendarRateLimit = checkUsageLimit('calendar', 1);
+export const newsRateLimit = checkUsageLimit('news', 1);
+
+// Middleware for premium features
+export const premiumFeatureLimit = (requiredTiers = ['pro', 'enterprise']) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const userTier = req.user.profile?.subscription_tier || 'free';
+
+    if (!requiredTiers.includes(userTier)) {
+      return res.status(403).json({
+        error: 'Premium feature',
+        message: `This feature requires ${requiredTiers.join(' or ')} subscription`,
+        currentTier: userTier,
+        requiredTiers: requiredTiers,
+        upgradeUrl: '/subscription/upgrade'
+      });
+    }
+
+    next();
+  };
+};
+```
+
+## Frontend Usage Management
+
+### 1. Usage Tracking Hook
+
+```typescript
+// src/hooks/useUsage.ts
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from './useAuth';
+import { supabase } from '../services/supabase';
+
+interface UsageStats {
+  currentUsage: number;
+  limit: number;
+  remaining: number;
+  tier: string;
+  usagePercentage: number;
+  todayQueries: number;
+  todayLLMQueries: number;
+}
+
+interface UsageHistory {
+  id: string;
+  query_type: string;
+  query_subtype: string | null;
+  timestamp: string;
+  credits_used: number;
+  cost: number;
+  metadata: any;
+}
+
+export const useUsage = () => {
+  const { user } = useAuth();
+  const [usage, setUsage] = useState<UsageStats | null>(null);
+  const [history, setHistory] = useState<UsageHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchUsage = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch('/api/user/usage', {
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch usage');
+
+      const data = await response.json();
+      setUsage(data.stats);
+      setHistory(data.history);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch usage');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchUsage();
+  }, [fetchUsage]);
+
+  const refreshUsage = useCallback(() => {
+    fetchUsage();
+  }, [fetchUsage]);
+
+  return { usage, history, loading, error, refreshUsage };
+};
+```
+
+### 2. Usage Dashboard Components
+
+```typescript
+// src/components/Usage/UsageGauge.tsx
+import React from 'react';
+import { useUsage } from '../../hooks/useUsage';
+
+export const UsageGauge: React.FC = () => {
+  const { usage, loading } = useUsage();
+
+  if (loading || !usage) {
+    return <div className="animate-pulse bg-gray-200 h-4 rounded"></div>;
+  }
+
+  const isNearLimit = usage.usagePercentage > 80;
+  const isAtLimit = usage.usagePercentage >= 100;
+
+  return (
+    <div className="bg-white rounded-lg shadow p-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-sm font-medium text-gray-700">Usage</h3>
+        <span className="text-sm text-gray-500">
+          {usage.currentUsage} / {usage.limit}
+        </span>
+      </div>
+
+      <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+        <div
+          className={`h-2 rounded-full transition-all duration-300 ${
+            isAtLimit ? 'bg-red-500' :
+            isNearLimit ? 'bg-yellow-500' : 'bg-blue-500'
+          }`}
+          style={{ width: `${Math.min(usage.usagePercentage, 100)}%` }}
+        ></div>
+      </div>
+
+      {isNearLimit && (
+        <div className="text-xs text-yellow-600">
+          ⚠️ Approaching usage limit. {usage.remaining} queries remaining.
+        </div>
+      )}
+
+      {isAtLimit && (
+        <div className="text-xs text-red-600">
+          🚫 Usage limit reached. Upgrade to continue.
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+```typescript
+// src/components/Usage/UsageHistory.tsx
+import React from 'react';
+import { useUsage } from '../../hooks/useUsage';
+
+export const UsageHistory: React.FC = () => {
+  const { history, loading } = useUsage();
+
+  if (loading) {
+    return <div className="animate-pulse">Loading usage history...</div>;
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  const getQueryTypeIcon = (queryType: string) => {
+    const icons = {
+      llm: '🤖',
+      analysis: '📊',
+      calendar: '📅',
+      news: '📰',
+      system: '⚙️'
+    };
+    return icons[queryType] || '❓';
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow">
+      <div className="px-4 py-3 border-b border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900">Usage History</h3>
+      </div>
+
+      <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+        {history.length === 0 ? (
+          <div className="px-4 py-8 text-center text-gray-500">
+            No usage history available
+          </div>
+        ) : (
+          history.map((item) => (
+            <div key={item.id} className="px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className="text-lg">{getQueryTypeIcon(item.query_type)}</span>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {item.query_subtype || item.query_type}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {formatDate(item.timestamp)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">
+                  {item.credits_used} credits
+                </p>
+                {item.cost > 0 && (
+                  <p className="text-xs text-gray-500">
+                    ${item.cost.toFixed(4)}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+```
+
+## Usage Analytics and Insights
+
+### 1. Usage Analytics Service
+
+```javascript
+// backend/src/services/analytics/UsageAnalyticsService.js
+export class UsageAnalyticsService {
+  constructor(supabase) {
+    this.supabase = supabase;
+  }
+
+  // Get user usage patterns
+  async getUserUsagePatterns(userId, timeframe = '30 days') {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(timeframe.split(' ')[0]));
+
+      const { data } = await this.supabase
+        .from('user_usage')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('timestamp', startDate.toISOString());
+
+      // Analyze patterns
+      const patterns = {
+        mostUsedFeatures: this.getMostUsedFeatures(data),
+        peakUsageHours: this.getPeakUsageHours(data),
+        queryTypeDistribution: this.getQueryTypeDistribution(data),
+        averageDailyUsage: this.getAverageDailyUsage(data),
+        usageTrend: this.getUsageTrend(data)
+      };
+
+      return patterns;
+    } catch (error) {
+      logger.error('Error getting usage patterns:', error);
+      throw error;
+    }
+  }
+
+  getMostUsedFeatures(usage) {
+    const featureCount = usage.reduce((count, item) => {
+      const key = item.query_subtype || item.query_type;
+      count[key] = (count[key] || 0) + 1;
+      return count;
+    }, {});
+
+    return Object.entries(featureCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5);
+  }
+
+  getPeakUsageHours(usage) {
+    const hourCount = usage.reduce((count, item) => {
+      const hour = new Date(item.timestamp).getHours();
+      count[hour] = (count[hour] || 0) + 1;
+      return count;
+    }, {});
+
+    return Object.entries(hourCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3);
+  }
+
+  getQueryTypeDistribution(usage) {
+    const typeCount = usage.reduce((count, item) => {
+      count[item.query_type] = (count[item.query_type] || 0) + 1;
+      return count;
+    }, {});
+
+    const total = Object.values(typeCount).reduce((sum, val) => sum + val, 0);
+
+    return Object.entries(typeCount).map(([type, count]) => ({
+      type,
+      count,
+      percentage: (count / total * 100).toFixed(1)
+    }));
+  }
+
+  getAverageDailyUsage(usage) {
+    const days = usage.reduce((dayMap, item) => {
+      const day = new Date(item.timestamp).toDateString();
+      if (!dayMap[day]) dayMap[day] = [];
+      dayMap[day].push(item);
+      return dayMap;
+    }, {});
+
+    const dailyUsage = Object.values(days).map((dayUsage: any[]) => dayUsage.length);
+    const average = dailyUsage.reduce((sum, val) => sum + val, 0) / dailyUsage.length;
+
+    return Math.round(average);
+  }
+
+  getUsageTrend(usage) {
+    // Group by day and calculate trend
+    const dailyUsage = usage.reduce((trend, item) => {
+      const day = new Date(item.timestamp).toDateString();
+      trend[day] = (trend[day] || 0) + 1;
+      return trend;
+    }, {});
+
+    return Object.entries(dailyUsage)
+      .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+      .map(([date, count]) => ({ date, count }));
+  }
+}
+```
+
+## Usage Optimization Features
+
+### 1. Smart Usage Warnings
+
+```typescript
+// src/components/Usage/UsageWarning.tsx
+import React from 'react';
+import { useUsage } from '../../hooks/useUsage';
+import { useAuth } from '../../hooks/useAuth';
+
+export const UsageWarning: React.FC = () => {
+  const { usage } = useUsage();
+  const { user } = useAuth();
+
+  if (!usage || !user) return null;
+
+  const showWarning = usage.usagePercentage > 80;
+  const showCritical = usage.usagePercentage >= 95;
+
+  if (showCritical) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">
+              Critical: Usage Limit Approaching
+            </h3>
+            <p className="mt-2 text-sm text-red-700">
+              You have only {usage.remaining} queries remaining. Upgrade now to avoid service interruption.
+            </p>
+            <div className="mt-4">
+              <div className="-mx-2 -my-1.5 flex">
+                <button
+                  type="button"
+                  className="bg-red-50 px-2 py-1.5 rounded-md text-sm font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-50 focus:ring-red-600"
+                >
+                  Upgrade Plan
+                </button>
+                <button
+                  type="button"
+                  className="ml-3 bg-red-50 px-2 py-1.5 rounded-md text-sm font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-50 focus:ring-red-600"
+                >
+                  View Usage
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showWarning) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-yellow-800">
+              Usage Warning
+            </h3>
+            <p className="mt-2 text-sm text-yellow-700">
+              You're using {usage.usagePercentage.toFixed(0)}% of your monthly allowance. {usage.remaining} queries remaining.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+```
+
+### 2. Usage Efficiency Tips
+
+```typescript
+// src/components/Usage/UsageTips.tsx
+import React from 'react';
+import { useUsage } from '../../hooks/useUsage';
+
+export const UsageTips: React.FC = () => {
+  const { usage } = useUsage();
+
+  if (!usage) return null;
+
+  const getTips = () => {
+    const tips = [];
+
+    if (usage.tier === 'free') {
+      tips.push('Consider upgrading to Pro for 50x more queries');
+    }
+
+    if (usage.usagePercentage > 70) {
+      tips.push('Try batching similar queries to optimize usage');
+    }
+
+    // Add more contextual tips based on usage patterns
+    tips.push('Use saved queries to avoid re-running similar analyses');
+    tips.push('Check usage history to identify optimization opportunities');
+
+    return tips;
+  };
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <h3 className="text-sm font-medium text-blue-800 mb-2">
+        💡 Usage Optimization Tips
+      </h3>
+      <ul className="text-sm text-blue-700 space-y-1">
+        {getTips().map((tip, index) => (
+          <li key={index} className="flex items-start">
+            <span className="mr-2">•</span>
+            {tip}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+```
+
+This comprehensive usage tracking system will provide transparency, encourage efficient usage, and create opportunities for upselling premium features while maintaining a great user experience.

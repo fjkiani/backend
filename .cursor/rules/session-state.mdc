@@ -1,0 +1,842 @@
+---
+globs: backend/src/services/session/*.js,src/hooks/useSession.ts,src/components/Session/*.tsx
+description: Session state management and user behavior tracking patterns
+---
+
+# Session State Management and User Behavior Tracking for SaaS
+
+This rule provides guidance for implementing comprehensive session state management, user behavior tracking, and personalized experiences in the SaaS platform.
+
+## Session Management Service
+
+### 1. Core Session Service
+
+```javascript
+// backend/src/services/session/SessionService.js
+import crypto from 'crypto';
+import logger from '../../logger.js';
+
+export class SessionService {
+  constructor(supabase) {
+    this.supabase = supabase;
+  }
+
+  // Start a new user session
+  async startSession(userId, sessionData = {}) {
+    try {
+      const sessionId = crypto.randomUUID();
+      const sessionStart = new Date();
+
+      const session = {
+        id: sessionId,
+        user_id: userId,
+        session_start: sessionStart,
+        last_activity: sessionStart,
+        session_duration: 0,
+        user_actions: [],
+        current_context: {
+          recentQueries: [],
+          favoriteSectors: [],
+          preferredSources: [],
+          searchHistory: [],
+          currentWorkflow: null,
+          lastViewedFeatures: [],
+          ...sessionData
+        },
+        device_info: {},
+        ip_address: null
+      };
+
+      const { data, error } = await this.supabase
+        .from('user_sessions')
+        .insert(session)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      logger.info('Session started:', { userId, sessionId });
+      return data;
+    } catch (error) {
+      logger.error('Error starting session:', error);
+      throw error;
+    }
+  }
+
+  // Update session with user activity
+  async updateSessionActivity(sessionId, action, actionData = {}) {
+    try {
+      const now = new Date();
+
+      // Get current session
+      const { data: session, error: fetchError } = await this.supabase
+        .from('user_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Update context based on action
+      const updatedContext = this.updateContextFromAction(session.current_context, action, actionData);
+
+      // Add action to history
+      const newAction = {
+        action,
+        timestamp: now,
+        data: actionData
+      };
+
+      const updatedActions = [...session.user_actions, newAction].slice(-50); // Keep last 50 actions
+
+      // Calculate session duration
+      const sessionDuration = Math.floor((now - new Date(session.session_start)) / 1000);
+
+      // Update session
+      const { error: updateError } = await this.supabase
+        .from('user_sessions')
+        .update({
+          last_activity: now,
+          session_duration: sessionDuration,
+          current_context: updatedContext,
+          user_actions: updatedActions
+        })
+        .eq('id', sessionId);
+
+      if (updateError) throw updateError;
+
+      logger.debug('Session updated:', { sessionId, action });
+      return updatedContext;
+    } catch (error) {
+      logger.error('Error updating session:', error);
+      throw error;
+    }
+  }
+
+  // Update context based on user actions
+  updateContextFromAction(context, action, actionData) {
+    const newContext = { ...context };
+
+    switch (action) {
+      case 'query_llm':
+        newContext.recentQueries = [actionData.query, ...newContext.recentQueries.slice(0, 9)];
+        if (actionData.sector) {
+          newContext.favoriteSectors = this.updateFrequencyMap(newContext.favoriteSectors, actionData.sector);
+        }
+        break;
+
+      case 'view_calendar':
+        newContext.lastViewedFeatures = ['calendar', ...newContext.lastViewedFeatures.filter(f => f !== 'calendar')];
+        break;
+
+      case 'view_news':
+        newContext.lastViewedFeatures = ['news', ...newContext.lastViewedFeatures.filter(f => f !== 'news')];
+        if (actionData.source) {
+          newContext.preferredSources = this.updateFrequencyMap(newContext.preferredSources, actionData.source);
+        }
+        break;
+
+      case 'create_dashboard':
+        newContext.lastViewedFeatures = ['dashboard', ...newContext.lastViewedFeatures.filter(f => f !== 'dashboard')];
+        break;
+
+      case 'start_workflow':
+        newContext.currentWorkflow = actionData.workflowId;
+        break;
+
+      case 'complete_workflow':
+        newContext.currentWorkflow = null;
+        break;
+    }
+
+    return newContext;
+  }
+
+  // Helper to update frequency maps
+  updateFrequencyMap(map, key) {
+    const newMap = { ...map };
+    newMap[key] = (newMap[key] || 0) + 1;
+    return newMap;
+  }
+
+  // Get session context for personalization
+  async getSessionContext(sessionId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('user_sessions')
+        .select('current_context, user_actions, last_activity')
+        .eq('id', sessionId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      logger.error('Error getting session context:', error);
+      return null;
+    }
+  }
+
+  // End session
+  async endSession(sessionId) {
+    try {
+      const now = new Date();
+      const sessionDuration = Math.floor((now - new Date()) / 1000); // Would need session start time
+
+      const { error } = await this.supabase
+        .from('user_sessions')
+        .update({
+          session_duration: sessionDuration,
+          last_activity: now
+        })
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      logger.info('Session ended:', { sessionId });
+    } catch (error) {
+      logger.error('Error ending session:', error);
+    }
+  }
+
+  // Get user behavior analytics
+  async getUserBehaviorAnalytics(userId, timeframe = '30 days') {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(timeframe.split(' ')[0]));
+
+      const { data: sessions, error } = await this.supabase
+        .from('user_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('session_start', startDate.toISOString())
+        .order('session_start', { ascending: false });
+
+      if (error) throw error;
+
+      const analytics = {
+        totalSessions: sessions.length,
+        averageSessionDuration: this.calculateAverageDuration(sessions),
+        mostUsedFeatures: this.analyzeFeatureUsage(sessions),
+        preferredSources: this.analyzeSourcePreferences(sessions),
+        favoriteSectors: this.analyzeSectorPreferences(sessions),
+        sessionPatterns: this.analyzeSessionPatterns(sessions),
+        recentActivity: sessions.slice(0, 5)
+      };
+
+      return analytics;
+    } catch (error) {
+      logger.error('Error getting user behavior analytics:', error);
+      throw error;
+    }
+  }
+
+  calculateAverageDuration(sessions) {
+    if (sessions.length === 0) return 0;
+    const totalDuration = sessions.reduce((sum, session) => sum + (session.session_duration || 0), 0);
+    return Math.round(totalDuration / sessions.length);
+  }
+
+  analyzeFeatureUsage(sessions) {
+    const featureCount = {};
+
+    sessions.forEach(session => {
+      session.user_actions.forEach(action => {
+        const feature = this.actionToFeature(action.action);
+        if (feature) {
+          featureCount[feature] = (featureCount[feature] || 0) + 1;
+        }
+      });
+    });
+
+    return Object.entries(featureCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5);
+  }
+
+  actionToFeature(action) {
+    const mapping = {
+      'query_llm': 'llm_analysis',
+      'view_calendar': 'calendar',
+      'view_news': 'news',
+      'create_dashboard': 'dashboard',
+      'start_workflow': 'workflows'
+    };
+    return mapping[action] || action;
+  }
+
+  analyzeSourcePreferences(sessions) {
+    const sourceCount = {};
+
+    sessions.forEach(session => {
+      Object.entries(session.current_context.preferredSources || {}).forEach(([source, count]) => {
+        sourceCount[source] = (sourceCount[source] || 0) + count;
+      });
+    });
+
+    return Object.entries(sourceCount)
+      .sort(([,a], [,b]) => b - a);
+  }
+
+  analyzeSectorPreferences(sessions) {
+    const sectorCount = {};
+
+    sessions.forEach(session => {
+      Object.entries(session.current_context.favoriteSectors || {}).forEach(([sector, count]) => {
+        sectorCount[sector] = (sectorCount[sector] || 0) + count;
+      });
+    });
+
+    return Object.entries(sectorCount)
+      .sort(([,a], [,b]) => b - a);
+  }
+
+  analyzeSessionPatterns(sessions) {
+    const patterns = {
+      peakHours: this.getPeakHours(sessions),
+      averageActionsPerSession: this.getAverageActionsPerSession(sessions),
+      commonWorkflows: this.getCommonWorkflows(sessions)
+    };
+
+    return patterns;
+  }
+
+  getPeakHours(sessions) {
+    const hourCount = {};
+
+    sessions.forEach(session => {
+      const hour = new Date(session.session_start).getHours();
+      hourCount[hour] = (hourCount[hour] || 0) + 1;
+    });
+
+    return Object.entries(hourCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3);
+  }
+
+  getAverageActionsPerSession(sessions) {
+    if (sessions.length === 0) return 0;
+    const totalActions = sessions.reduce((sum, session) => sum + session.user_actions.length, 0);
+    return Math.round(totalActions / sessions.length);
+  }
+
+  getCommonWorkflows(sessions) {
+    const workflowCount = {};
+
+    sessions.forEach(session => {
+      session.user_actions.forEach(action => {
+        if (action.action === 'start_workflow' && action.data.workflowId) {
+          workflowCount[action.data.workflowId] = (workflowCount[action.data.workflowId] || 0) + 1;
+        }
+      });
+    });
+
+    return Object.entries(workflowCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5);
+  }
+}
+```
+
+## Frontend Session Management
+
+### 1. Session Context Hook
+
+```typescript
+// src/hooks/useSession.ts
+import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { useAuth } from './useAuth';
+import { supabase } from '../services/supabase';
+
+interface SessionContextType {
+  sessionId: string | null;
+  context: any;
+  updateContext: (action: string, data?: any) => Promise<void>;
+  sessionAnalytics: any;
+  loading: boolean;
+}
+
+const SessionContext = createContext<SessionContextType | undefined>(undefined);
+
+export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [context, setContext] = useState<any>({});
+  const [sessionAnalytics, setSessionAnalytics] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const startSession = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch('/api/session/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          userAgent: navigator.userAgent,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          screenSize: `${window.screen.width}x${window.screen.height}`
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to start session');
+
+      const sessionData = await response.json();
+      setSessionId(sessionData.id);
+      setContext(sessionData.current_context);
+    } catch (error) {
+      console.error('Error starting session:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  const updateContext = useCallback(async (action: string, data: any = {}) => {
+    if (!sessionId) return;
+
+    try {
+      const response = await fetch('/api/session/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          sessionId,
+          action,
+          data
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update session');
+
+      const updatedContext = await response.json();
+      setContext(updatedContext);
+    } catch (error) {
+      console.error('Error updating session context:', error);
+    }
+  }, [sessionId]);
+
+  const fetchSessionAnalytics = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const response = await fetch('/api/session/analytics', {
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch analytics');
+
+      const analytics = await response.json();
+      setSessionAnalytics(analytics);
+    } catch (error) {
+      console.error('Error fetching session analytics:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      startSession();
+      fetchSessionAnalytics();
+    }
+  }, [user, startSession, fetchSessionAnalytics]);
+
+  const value = {
+    sessionId,
+    context,
+    updateContext,
+    sessionAnalytics,
+    loading,
+  };
+
+  return (
+    <SessionContext.Provider value={value}>
+      {children}
+    </SessionContext.Provider>
+  );
+};
+
+export const useSession = () => {
+  const context = useContext(SessionContext);
+  if (context === undefined) {
+    throw new Error('useSession must be used within a SessionProvider');
+  }
+  return context;
+};
+```
+
+### 2. Personalized Components
+
+```typescript
+// src/components/Session/PersonalizedSuggestions.tsx
+import React from 'react';
+import { useSession } from '../../hooks/useSession';
+import { useAuth } from '../../hooks/useAuth';
+
+export const PersonalizedSuggestions: React.FC = () => {
+  const { context } = useSession();
+  const { user } = useAuth();
+
+  const getSuggestions = () => {
+    if (!context) return [];
+
+    const suggestions = [];
+
+    // Suggest based on favorite sectors
+    const topSectors = Object.entries(context.favoriteSectors || {})
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3);
+
+    if (topSectors.length > 0) {
+      suggestions.push({
+        type: 'sector',
+        title: 'Continue exploring your favorite sectors',
+        description: `Based on your activity, you're interested in: ${topSectors.map(([sector]) => sector).join(', ')}`,
+        action: () => {/* Navigate to sector analysis */}
+      });
+    }
+
+    // Suggest based on recent queries
+    if (context.recentQueries?.length > 0) {
+      suggestions.push({
+        type: 'query',
+        title: 'Recent analysis patterns',
+        description: 'Continue with similar market analyses you\'ve been running',
+        action: () => {/* Show recent queries */}
+      });
+    }
+
+    // Suggest based on preferred sources
+    const topSources = Object.entries(context.preferredSources || {})
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 2);
+
+    if (topSources.length > 0) {
+      suggestions.push({
+        type: 'source',
+        title: 'Your preferred news sources',
+        description: `Quick access to ${topSources.map(([source]) => source).join(' and ')}`,
+        action: () => {/* Navigate to preferred sources */}
+      });
+    }
+
+    // Suggest based on last viewed features
+    if (context.lastViewedFeatures?.length > 0) {
+      const lastFeature = context.lastViewedFeatures[0];
+      suggestions.push({
+        type: 'feature',
+        title: 'Continue where you left off',
+        description: `Pick up from your last ${lastFeature} session`,
+        action: () => {/* Navigate to last feature */}
+      });
+    }
+
+    return suggestions;
+  };
+
+  const suggestions = getSuggestions();
+
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      <h3 className="text-lg font-semibold text-blue-900 mb-3">
+        🎯 Personalized Suggestions
+      </h3>
+
+      <div className="space-y-3">
+        {suggestions.map((suggestion, index) => (
+          <div key={index} className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                {suggestion.type === 'sector' && '📈'}
+                {suggestion.type === 'query' && '🔍'}
+                {suggestion.type === 'source' && '📰'}
+                {suggestion.type === 'feature' && '⚡'}
+              </div>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-blue-900">
+                {suggestion.title}
+              </h4>
+              <p className="text-sm text-blue-700 mb-2">
+                {suggestion.description}
+              </p>
+              <button
+                onClick={suggestion.action}
+                className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+              >
+                Explore
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+```
+
+```typescript
+// src/components/Session/SessionActivity.tsx
+import React from 'react';
+import { useSession } from '../../hooks/useSession';
+
+export const SessionActivity: React.FC = () => {
+  const { sessionAnalytics, loading } = useSession();
+
+  if (loading || !sessionAnalytics) {
+    return <div className="animate-pulse">Loading session activity...</div>;
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h3 className="text-lg font-semibold mb-4">Session Insights</h3>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-blue-600">
+            {sessionAnalytics.totalSessions}
+          </div>
+          <div className="text-sm text-gray-600">Total Sessions</div>
+        </div>
+
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">
+            {Math.round(sessionAnalytics.averageSessionDuration / 60)}m
+          </div>
+          <div className="text-sm text-gray-600">Avg Duration</div>
+        </div>
+
+        <div className="text-center">
+          <div className="text-2xl font-bold text-purple-600">
+            {sessionAnalytics.averageActionsPerSession}
+          </div>
+          <div className="text-sm text-gray-600">Actions/Session</div>
+        </div>
+
+        <div className="text-center">
+          <div className="text-2xl font-bold text-orange-600">
+            {sessionAnalytics.mostUsedFeatures?.[0]?.[1] || 0}
+          </div>
+          <div className="text-sm text-gray-600">Top Feature Uses</div>
+        </div>
+      </div>
+
+      {sessionAnalytics.mostUsedFeatures?.length > 0 && (
+        <div className="mb-4">
+          <h4 className="font-medium text-gray-900 mb-2">Most Used Features</h4>
+          <div className="space-y-2">
+            {sessionAnalytics.mostUsedFeatures.slice(0, 3).map(([feature, count], index) => (
+              <div key={index} className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 capitalize">
+                  {feature.replace('_', ' ')}
+                </span>
+                <span className="text-sm font-medium">{count} uses</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {sessionAnalytics.preferredSources?.length > 0 && (
+        <div>
+          <h4 className="font-medium text-gray-900 mb-2">Preferred Sources</h4>
+          <div className="space-y-2">
+            {sessionAnalytics.preferredSources.slice(0, 3).map(([source, count], index) => (
+              <div key={index} className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">{source}</span>
+                <span className="text-sm font-medium">{count} views</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+## Session State Integration
+
+### 1. Backend Route Handlers
+
+```javascript
+// backend/src/routes/session.js
+import express from 'express';
+import { authenticateUser } from '../middleware/auth.js';
+import { SessionService } from '../services/session/SessionService.js';
+
+const router = express.Router();
+router.use(authenticateUser);
+
+const sessionService = new SessionService();
+
+// Start session
+router.post('/start', async (req, res) => {
+  try {
+    const { userAgent, timezone, screenSize } = req.body;
+    const userId = req.user.id;
+
+    const session = await sessionService.startSession(userId, {
+      device_info: {
+        userAgent,
+        timezone,
+        screenSize
+      },
+      ip_address: req.ip
+    });
+
+    res.json(session);
+  } catch (error) {
+    console.error('Error starting session:', error);
+    res.status(500).json({ error: 'Failed to start session' });
+  }
+});
+
+// Update session
+router.post('/update', async (req, res) => {
+  try {
+    const { sessionId, action, data } = req.body;
+    const userId = req.user.id;
+
+    // Verify session belongs to user
+    const { data: session } = await req.supabase
+      .from('user_sessions')
+      .select('user_id')
+      .eq('id', sessionId)
+      .single();
+
+    if (!session || session.user_id !== userId) {
+      return res.status(403).json({ error: 'Invalid session' });
+    }
+
+    const updatedContext = await sessionService.updateSessionActivity(sessionId, action, data);
+    res.json(updatedContext);
+  } catch (error) {
+    console.error('Error updating session:', error);
+    res.status(500).json({ error: 'Failed to update session' });
+  }
+});
+
+// Get session analytics
+router.get('/analytics', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { timeframe = '30 days' } = req.query;
+
+    const analytics = await sessionService.getUserBehaviorAnalytics(userId, timeframe);
+    res.json(analytics);
+  } catch (error) {
+    console.error('Error fetching session analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// End session
+router.post('/end', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const userId = req.user.id;
+
+    // Verify session belongs to user
+    const { data: session } = await req.supabase
+      .from('user_sessions')
+      .select('user_id')
+      .eq('id', sessionId)
+      .single();
+
+    if (!session || session.user_id !== userId) {
+      return res.status(403).json({ error: 'Invalid session' });
+    }
+
+    await sessionService.endSession(sessionId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error ending session:', error);
+    res.status(500).json({ error: 'Failed to end session' });
+  }
+});
+
+export default router;
+```
+
+### 2. Integration with Existing Features
+
+```typescript
+// src/components/News/NewsAnalysis.tsx
+import React, { useEffect } from 'react';
+import { useSession } from '../../hooks/useSession';
+
+export const NewsAnalysis: React.FC = () => {
+  const { updateContext } = useSession();
+
+  const handleQuery = async (query: string) => {
+    // Track the query action
+    await updateContext('query_llm', { 
+      query,
+      sector: extractSectorFromQuery(query),
+      timestamp: new Date().toISOString()
+    });
+
+    // Rest of the query logic
+    // ...
+  };
+
+  const handleViewSource = async (source: string) => {
+    // Track source viewing
+    await updateContext('view_news', { source });
+
+    // Rest of the logic
+    // ...
+  };
+
+  useEffect(() => {
+    // Track feature view
+    updateContext('view_feature', { feature: 'news_analysis' });
+  }, [updateContext]);
+
+  return (
+    // Component JSX
+  );
+};
+```
+
+```typescript
+// src/components/Calendar/EconomicCalendar.tsx
+import React, { useEffect } from 'react';
+import { useSession } from '../../hooks/useSession';
+
+export const EconomicCalendar: React.FC = () => {
+  const { updateContext } = useSession();
+
+  useEffect(() => {
+    // Track calendar view
+    updateContext('view_calendar', { 
+      timestamp: new Date().toISOString() 
+    });
+  }, [updateContext]);
+
+  const handleInterpretEvent = async (eventId: string) => {
+    // Track interpretation request
+    await updateContext('interpret_event', { 
+      eventId,
+      timestamp: new Date().toISOString()
+    });
+
+    // Rest of the logic
+    // ...
+  };
+
+  return (
+    // Component JSX
+  );
+};
+```
+
+This comprehensive session state management system will create a personalized, adaptive user experience that learns from user behavior and provides increasingly relevant features and suggestions over time. The system tracks user preferences, usage patterns, and feature engagement to deliver a tailored experience that improves with continued use.

@@ -1,8 +1,8 @@
 export const config = {
   // Backend URL - use environment variable with fallbacks
-  BACKEND_URL: import.meta.env.VITE_BACKEND_URL || 
-               (import.meta.env.MODE === 'production' 
-                 ? 'https://backend-khaki-omega.vercel.app'
+  BACKEND_URL: import.meta.env.VITE_BACKEND_URL ||
+               (import.meta.env.MODE === 'production'
+                 ? 'https://web-production-1c60b.up.railway.app'
                  : 'http://localhost:3001'),
   
   // Other config values

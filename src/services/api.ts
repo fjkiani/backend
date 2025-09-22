@@ -1,7 +1,8 @@
 import { supabase } from './supabase/client';
 import type { RawNewsArticle } from '../types';
+import { BACKEND_CONFIG } from './backend/config';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const API_URL = BACKEND_CONFIG.BASE_URL;
 
 class BackendAPI {
   private async handleSupabaseError(error: any): Promise<never> {

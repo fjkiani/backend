@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 
-// Point to the local backend server during development
-const BACKEND_URL = 'http://localhost:3001';
-const API_ENDPOINT = `${BACKEND_URL}/api/context/latest`;
+// Use the configured backend URL
+import { BACKEND_CONFIG } from '../services/backend/config';
+const API_ENDPOINT = `${BACKEND_CONFIG.BASE_URL}/api/context/latest`;
 
 // Interface for the expected API response
 interface MarketContextResponse {

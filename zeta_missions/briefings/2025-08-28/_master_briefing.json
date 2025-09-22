@@ -1,0 +1,51 @@
+{
+  "key_macroeconomic_events": [
+    {
+      "event_name": "Labor Day Market Closure",
+      "date": "2025-09-01",
+      "category": "Market Holiday",
+      "potential_impact": "U.S. stock markets will be closed, resulting in reduced liquidity and likely muted trading in global markets."
+    },
+    {
+      "event_name": "Nonfarm Payrolls Report Release",
+      "date": "2025-09-05",
+      "category": "Labor Market",
+      "potential_impact": "Fresh employment data will shape investor expectations for monetary policy adjustments and offer insight into economic momentum."
+    },
+    {
+      "event_name": "PCE Price Index Release",
+      "date": "Early September 2025",
+      "category": "Inflation",
+      "potential_impact": "As the Fed's preferred inflation measure, an elevated PCE will directly influence the likelihood and timing of potential rate cuts."
+    },
+    {
+      "event_name": "Federal Reserve Policy Decision",
+      "date": "2025-09-17",
+      "category": "Monetary Policy",
+      "potential_impact": "A widely anticipated Fed policy announcement, with markets pricing in a high probability of a rate cut, which would alter risk appetite and asset prices."
+    }
+  ],
+  "companies_to_watch": [
+    {
+      "company_name": "Adobe",
+      "ticker": "ADBE",
+      "event": "Q3 Earnings Report",
+      "category": "Corporate Earnings",
+      "key_focus": "Investors will analyze growth in Creative Cloud and Experience Cloud subscriptions, as well as product innovation and overall topline momentum."
+    },
+    {
+      "company_name": "GameStop",
+      "ticker": "GME",
+      "event": "Q2 Earnings Report",
+      "category": "Corporate Earnings",
+      "key_focus": "Market participants will focus on the company's progress in e-commerce and new technology initiatives within the gaming sector."
+    }
+  ],
+  "dominant_market_narratives": [
+    "Growing expectations of a Federal Reserve rate cut have triggered a rotation from large-cap tech stocks into interest rate-sensitive sectors and small-cap equities.",
+    "Persistent inflation above the Fed's 2% target continues to complicate monetary policy decisions and unsettle investor sentiment.",
+    "Trade policy uncertainty and expanded tariffs are weighing on technology, manufacturing, and consumer goods sectors, driving volatility and disrupting supply chains.",
+    "Global risks, notably from China's property market instability and Europe's energy issues, are increasing caution toward multinational corporations."
+  ],
+  "strategic_summary": "The week ahead is defined by the interplay of key macroeconomic events, most notably the Nonfarm Payrolls, PCE inflation data, and a pivotal Federal Reserve policy decision, all occurring amid heightened rate cut expectations and evolving sector rotations. Investors should closely monitor corporate earnings from sector bellwethers and be vigilant of ongoing global and policy-driven risks, which could amplify market volatility and drive sharp reallocations across assets."
+}

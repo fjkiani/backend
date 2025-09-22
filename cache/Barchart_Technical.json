@@ -1,0 +1,42 @@
+{
+  "source": "Barchart Technical",
+  "category": "technical",
+  "url": "https://www.barchart.com/stocks/quotes/NVDA/technical-analysis",
+  "rawData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.barchart.com/stocks/quotes/NVDA/technical-analysis",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [],
+    "type": "other",
+    "title": "NVDA Technical Analysis for Nvidia Corp Stock - Barchart.com"
+  },
+  "processedData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.barchart.com/stocks/quotes/NVDA/technical-analysis",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [],
+    "type": "other",
+    "title": "NVDA Technical Analysis for Nvidia Corp Stock - Barchart.com"
+  },
+  "qualityScore": {
+    "overall": 8
+  },
+  "timestamp": "2025-08-28T19:21:25.880Z",
+  "status": "success",
+  "extractionMethod": "diffbot",
+  "attempt": 2,
+  "priority": "medium",
+  "cachedAt": "2025-08-28T19:22:22.587Z"
+}

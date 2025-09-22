@@ -1,0 +1,770 @@
+---
+globs: *.js,*.ts,*.tsx
+description: Subscription management patterns for SaaS billing and tiers
+---
+
+# Subscription Management Patterns
+
+This rule covers subscription management patterns for our SaaS application, including Stripe integration and tier management.
+
+## Stripe Integration Architecture
+
+### 1. Subscription Service Structure
+```javascript
+// backend/src/services/subscription/SubscriptionService.js
+export class SubscriptionService {
+  constructor(stripe, supabase) {
+    this.stripe = stripe;
+    this.supabase = supabase;
+  }
+
+  // Tier configurations
+  getTierConfig(tier) {
+    const configs = {
+      free: {
+        priceId: null,
+        queryLimit: 10,
+        features: ['basic-news', 'basic-calendar']
+      },
+      pro: {
+        priceId: process.env.STRIPE_PRO_PRICE_ID,
+        queryLimit: 500,
+        features: ['advanced-analytics', 'custom-dashboards', 'priority-support']
+      },
+      enterprise: {
+        priceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
+        queryLimit: -1, // Unlimited
+        features: ['api-access', 'white-label', 'custom-integrations', 'dedicated-support']
+      }
+    };
+    return configs[tier];
+  }
+
+  // Create or update customer
+  async createOrUpdateCustomer(userId, email) {
+    const { data: profile } = await this.supabase
+      .from('user_profiles')
+      .select('stripe_customer_id')
+      .eq('id', userId)
+      .single();
+
+    if (profile.stripe_customer_id) {
+      // Update existing customer
+      return await this.stripe.customers.update(profile.stripe_customer_id, {
+        email: email
+      });
+    } else {
+      // Create new customer
+      const customer = await this.stripe.customers.create({
+        email: email,
+        metadata: {
+          userId: userId
+        }
+      });
+
+      // Update profile with customer ID
+      await this.supabase
+        .from('user_profiles')
+        .update({ stripe_customer_id: customer.id })
+        .eq('id', userId);
+
+      return customer;
+    }
+  }
+
+  // Create subscription
+  async createSubscription(userId, email, tier) {
+    const customer = await this.createOrUpdateCustomer(userId, email);
+    const tierConfig = this.getTierConfig(tier);
+
+    const subscription = await this.stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{
+        price: tierConfig.priceId
+      }],
+      payment_behavior: 'default_incomplete',
+      expand: ['latest_invoice.payment_intent'],
+      metadata: {
+        userId: userId,
+        tier: tier
+      }
+    });
+
+    return subscription;
+  }
+
+  // Handle subscription changes
+  async updateSubscriptionStatus(userId, subscriptionId, status) {
+    const updates = {
+      subscription_status: status,
+      updated_at: new Date().toISOString()
+    };
+
+    if (status === 'active') {
+      // Get subscription details to update tier and limits
+      const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      const tier = subscription.metadata.tier;
+      const tierConfig = this.getTierConfig(tier);
+      
+      updates.subscription_tier = tier;
+      updates.query_limit = tierConfig.queryLimit;
+      updates.stripe_subscription_id = subscriptionId;
+    }
+
+    await this.supabase
+      .from('user_profiles')
+      .update(updates)
+      .eq('id', userId);
+  }
+
+  // Cancel subscription
+  async cancelSubscription(userId) {
+    const { data: profile } = await this.supabase
+      .from('user_profiles')
+      .select('stripe_subscription_id')
+      .eq('id', userId)
+      .single();
+
+    if (profile.stripe_subscription_id) {
+      await this.stripe.subscriptions.update(profile.stripe_subscription_id, {
+        cancel_at_period_end: true
+      });
+    }
+  }
+
+  // Get subscription details
+  async getSubscriptionDetails(userId) {
+    const { data: profile } = await this.supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (!profile.stripe_subscription_id) {
+      return null;
+    }
+
+    const subscription = await this.stripe.subscriptions.retrieve(
+      profile.stripe_subscription_id
+    );
+
+    return {
+      ...subscription,
+      current_period_end: new Date(subscription.current_period_end * 1000),
+      cancel_at_period_end: subscription.cancel_at_period_end
+    };
+  }
+}
+```
+
+## Stripe Webhook Handling
+
+### 1. Webhook Handler
+```javascript
+// backend/src/routes/webhooks/stripe.js
+export const handleStripeWebhook = async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = this.stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  const subscriptionService = new SubscriptionService(this.stripe, req.supabase);
+
+  try {
+    switch (event.type) {
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+        const subscription = event.data.object;
+        const userId = subscription.metadata.userId;
+        await subscriptionService.updateSubscriptionStatus(
+          userId,
+          subscription.id,
+          subscription.status
+        );
+        break;
+
+      case 'customer.subscription.deleted':
+        const deletedSubscription = event.data.object;
+        const deletedUserId = deletedSubscription.metadata.userId;
+        await subscriptionService.updateSubscriptionStatus(
+          deletedUserId,
+          deletedSubscription.id,
+          'cancelled'
+        );
+        break;
+
+      case 'invoice.payment_succeeded':
+        const invoice = event.data.object;
+        if (invoice.subscription) {
+          const subscription = await this.stripe.subscriptions.retrieve(
+            invoice.subscription
+          );
+          const userId = subscription.metadata.userId;
+          await subscriptionService.updateSubscriptionStatus(
+            userId,
+            subscription.id,
+            'active'
+          );
+        }
+        break;
+
+      case 'invoice.payment_failed':
+        const failedInvoice = event.data.object;
+        if (failedInvoice.subscription) {
+          const subscription = await this.stripe.subscriptions.retrieve(
+            failedInvoice.subscription
+          );
+          const userId = subscription.metadata.userId;
+          await subscriptionService.updateSubscriptionStatus(
+            userId,
+            subscription.id,
+            'past_due'
+          );
+        }
+        break;
+
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Error handling webhook:', error);
+    res.status(500).json({ error: 'Webhook handler failed' });
+  }
+};
+```
+
+## Frontend Subscription Management
+
+### 1. Subscription Context and Hooks
+```tsx
+// src/hooks/useSubscription.ts
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useAuth } from './useAuth';
+
+interface SubscriptionContextType {
+  subscription: any;
+  tier: string;
+  isLoading: boolean;
+  upgradeToPro: () => Promise<void>;
+  upgradeToEnterprise: () => Promise<void>;
+  cancelSubscription: () => Promise<void>;
+  createCheckoutSession: (tier: string) => Promise<string>;
+}
+
+const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
+
+export const SubscriptionProvider = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  const [subscription, setSubscription] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      loadSubscription();
+    }
+  }, [user]);
+
+  const loadSubscription = async () => {
+    try {
+      const response = await apiClient.get('/api/subscription/details');
+      setSubscription(response);
+    } catch (error) {
+      console.error('Error loading subscription:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createCheckoutSession = async (tier: string) => {
+    const response = await apiClient.post('/api/subscription/create-checkout', {
+      tier,
+      successUrl: `${window.location.origin}/dashboard`,
+      cancelUrl: `${window.location.origin}/subscription`
+    });
+    return response.url;
+  };
+
+  const upgradeToPro = async () => {
+    const checkoutUrl = await createCheckoutSession('pro');
+    window.location.href = checkoutUrl;
+  };
+
+  const upgradeToEnterprise = async () => {
+    const checkoutUrl = await createCheckoutSession('enterprise');
+    window.location.href = checkoutUrl;
+  };
+
+  const cancelSubscription = async () => {
+    await apiClient.post('/api/subscription/cancel');
+    await loadSubscription();
+  };
+
+  const value = {
+    subscription,
+    tier: subscription?.tier || 'free',
+    isLoading,
+    upgradeToPro,
+    upgradeToEnterprise,
+    cancelSubscription,
+    createCheckoutSession
+  };
+
+  return (
+    <SubscriptionContext.Provider value={value}>
+      {children}
+    </SubscriptionContext.Provider>
+  );
+};
+
+export const useSubscription = () => {
+  const context = useContext(SubscriptionContext);
+  if (context === undefined) {
+    throw new Error('useSubscription must be used within a SubscriptionProvider');
+  }
+  return context;
+};
+```
+
+### 2. Subscription Components
+```tsx
+// src/components/Subscription/UpgradeModal.tsx
+import { useSubscription } from '../../hooks/useSubscription';
+import { Button } from '../ui/button';
+import { Card } from '../ui/card';
+
+interface UpgradeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  requiredTier?: string;
+}
+
+export const UpgradeModal = ({ isOpen, onClose, requiredTier }: UpgradeModalProps) => {
+  const { upgradeToPro, upgradeToEnterprise, tier } = useSubscription();
+
+  if (!isOpen) return null;
+
+  const getRequiredMessage = () => {
+    if (requiredTier === 'pro') {
+      return 'This feature requires a Pro subscription.';
+    }
+    if (requiredTier === 'enterprise') {
+      return 'This feature requires an Enterprise subscription.';
+    }
+    return 'Upgrade your subscription to access more features.';
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <Card className="p-6 max-w-md w-full">
+        <h2 className="text-2xl font-bold mb-4">Upgrade Required</h2>
+        <p className="text-gray-600 mb-6">{getRequiredMessage()}</p>
+        
+        <div className="space-y-4">
+          {tier === 'free' && (
+            <div className="border rounded-lg p-4">
+              <h3 className="font-semibold">Pro Plan - $100/month</h3>
+              <ul className="text-sm text-gray-600 mt-2">
+                <li>• 500 LLM queries per month</li>
+                <li>• Advanced analytics</li>
+                <li>• Custom dashboards</li>
+              </ul>
+              <Button 
+                onClick={upgradeToPro} 
+                className="w-full mt-4"
+              >
+                Upgrade to Pro
+              </Button>
+            </div>
+          )}
+          
+          <div className="border rounded-lg p-4">
+            <h3 className="font-semibold">Enterprise Plan - $200/month</h3>
+            <ul className="text-sm text-gray-600 mt-2">
+              <li>• Unlimited queries</li>
+              <li>• API access</li>
+              <li>• White-label options</li>
+              <li>• Dedicated support</li>
+            </ul>
+            <Button 
+              onClick={upgradeToEnterprise} 
+              variant="outline" 
+              className="w-full mt-4"
+            >
+              Upgrade to Enterprise
+            </Button>
+          </div>
+        </div>
+        
+        <Button variant="ghost" onClick={onClose} className="w-full mt-4">
+          Maybe Later
+        </Button>
+      </Card>
+    </div>
+  );
+};
+```
+
+### 3. Usage Tracking Component
+```tsx
+// src/components/Subscription/UsageTracker.tsx
+import { useAuth } from '../../hooks/useAuth';
+import { useSubscription } from '../../hooks/useSubscription';
+import { Progress } from '../ui/progress';
+import { Alert } from '../ui/alert';
+
+export const UsageTracker = () => {
+  const { profile } = useAuth();
+  const { tier } = useSubscription();
+  
+  if (!profile) return null;
+  
+  const { query_count, query_limit } = profile;
+  const usagePercentage = (query_count / query_limit) * 100;
+  const isNearLimit = usagePercentage > 80;
+  const isAtLimit = query_count >= query_limit;
+
+  return (
+    <div className="bg-white p-4 rounded-lg border">
+      <h3 className="font-semibold mb-2">Usage This Month</h3>
+      
+      <div className="flex justify-between text-sm mb-2">
+        <span>Queries Used</span>
+        <span>{query_count} / {query_limit === -1 ? '∞' : query_limit}</span>
+      </div>
+      
+      {query_limit !== -1 && (
+        <Progress value={usagePercentage} className="mb-2" />
+      )}
+      
+      {isAtLimit && (
+        <Alert variant="destructive">
+          <p>You've reached your monthly query limit. Upgrade to continue using the service.</p>
+        </Alert>
+      )}
+      
+      {isNearLimit && !isAtLimit && (
+        <Alert>
+          <p>You're approaching your monthly limit. Consider upgrading for more queries.</p>
+        </Alert>
+      )}
+      
+      <div className="text-xs text-gray-500 mt-2">
+        Resets on the 1st of each month
+      </div>
+    </div>
+  );
+};
+```
+
+## Subscription Management Routes
+
+### 1. API Routes
+```javascript
+// backend/src/routes/subscription.js
+import { Router } from 'express';
+import { SubscriptionService } from '../services/subscription/SubscriptionService.js';
+import { authenticateUser } from '../middleware/auth.js';
+
+const router = Router();
+
+// Get subscription details
+router.get('/details', authenticateUser, async (req, res) => {
+  try {
+    const subscriptionService = new SubscriptionService(req.stripe, req.supabase);
+    const details = await subscriptionService.getSubscriptionDetails(req.user.id);
+    res.json(details);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create checkout session
+router.post('/create-checkout', authenticateUser, async (req, res) => {
+  try {
+    const { tier, successUrl, cancelUrl } = req.body;
+    const subscriptionService = new SubscriptionService(req.stripe, req.supabase);
+    
+    const { data: profile } = await req.supabase
+      .from('user_profiles')
+      .select('email')
+      .eq('id', req.user.id)
+      .single();
+    
+    const session = await subscriptionService.createCheckoutSession(
+      req.user.id,
+      profile.email,
+      tier,
+      successUrl,
+      cancelUrl
+    );
+    
+    res.json({ url: session.url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cancel subscription
+router.post('/cancel', authenticateUser, async (req, res) => {
+  try {
+    const subscriptionService = new SubscriptionService(req.stripe, req.supabase);
+    await subscriptionService.cancelSubscription(req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update subscription
+router.post('/update', authenticateUser, async (req, res) => {
+  try {
+    const { newTier } = req.body;
+    const subscriptionService = new SubscriptionService(req.stripe, req.supabase);
+    
+    const { data: profile } = await req.supabase
+      .from('user_profiles')
+      .select('email')
+      .eq('id', req.user.id)
+      .single();
+    
+    const session = await subscriptionService.updateSubscription(
+      req.user.id,
+      profile.email,
+      newTier
+    );
+    
+    res.json({ url: session.url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;
+```
+
+## Billing and Invoicing
+
+### 1. Invoice Management
+```javascript
+// backend/src/services/billing/InvoiceService.js
+export class InvoiceService {
+  constructor(stripe, supabase) {
+    this.stripe = stripe;
+    this.supabase = supabase;
+  }
+
+  async getUserInvoices(userId) {
+    const { data: profile } = await this.supabase
+      .from('user_profiles')
+      .select('stripe_customer_id')
+      .eq('id', userId)
+      .single();
+    
+    if (!profile.stripe_customer_id) {
+      return [];
+    }
+    
+    const invoices = await this.stripe.invoices.list({
+      customer: profile.stripe_customer_id,
+      limit: 20
+    });
+    
+    return invoices.data;
+  }
+
+  async downloadInvoice(invoiceId) {
+    const invoice = await this.stripe.invoices.retrieve(invoiceId);
+    return invoice.invoice_pdf;
+  }
+
+  async getUpcomingInvoice(userId) {
+    const { data: profile } = await this.supabase
+      .from('user_profiles')
+      .select('stripe_customer_id')
+      .eq('id', userId)
+      .single();
+    
+    if (!profile.stripe_customer_id) {
+      return null;
+    }
+    
+    const invoice = await this.stripe.invoices.retrieveUpcoming({
+      customer: profile.stripe_customer_id
+    });
+    
+    return invoice;
+  }
+}
+```
+
+## Tier-Based Feature Access
+
+### 1. Feature Gates
+```javascript
+// backend/src/middleware/featureGates.js
+export const requireTier = (requiredTier) => {
+  return (req, res, next) => {
+    const userTier = req.subscription?.tier || 'free';
+    const tierHierarchy = { free: 0, pro: 1, enterprise: 2 };
+    
+    if (tierHierarchy[userTier] < tierHierarchy[requiredTier]) {
+      return res.status(402).json({
+        error: 'Insufficient subscription tier',
+        required: requiredTier,
+        current: userTier,
+        message: `This feature requires ${requiredTier} subscription.`
+      });
+    }
+    
+    next();
+  };
+};
+
+// Usage in routes
+router.post('/advanced-analysis', 
+  authenticateUser, 
+  requireTier('pro'), 
+  async (req, res) => {
+    // Only Pro and Enterprise users can access this
+  }
+);
+```
+
+### 2. Frontend Feature Gates
+```tsx
+// src/components/FeatureGate.tsx
+import { useSubscription } from '../hooks/useSubscription';
+import { UpgradeModal } from './Subscription/UpgradeModal';
+
+interface FeatureGateProps {
+  requiredTier: 'pro' | 'enterprise';
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+  showUpgrade?: boolean;
+}
+
+export const FeatureGate = ({ 
+  requiredTier, 
+  children, 
+  fallback,
+  showUpgrade = true 
+}: FeatureGateProps) => {
+  const { tier } = useSubscription();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  
+  const tierHierarchy = { free: 0, pro: 1, enterprise: 2 };
+  const hasAccess = tierHierarchy[tier] >= tierHierarchy[requiredTier];
+  
+  if (hasAccess) {
+    return <>{children}</>;
+  }
+  
+  if (fallback) {
+    return <>{fallback}</>;
+  }
+  
+  if (showUpgrade) {
+    return (
+      <>
+        <button
+          onClick={() => setShowUpgradeModal(true)}
+          className="text-blue-600 underline"
+        >
+          Upgrade to access this feature
+        </button>
+        <UpgradeModal 
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          requiredTier={requiredTier}
+        />
+      </>
+    );
+  }
+  
+  return null;
+};
+```
+
+## Analytics and Reporting
+
+### 1. Subscription Analytics
+```javascript
+// backend/src/services/analytics/SubscriptionAnalytics.js
+export class SubscriptionAnalytics {
+  constructor(supabase) {
+    this.supabase = supabase;
+  }
+
+  async getSubscriptionMetrics() {
+    const { data } = await this.supabase
+      .from('user_profiles')
+      .select('subscription_tier, created_at, query_count');
+    
+    const metrics = {
+      totalUsers: data.length,
+      tierBreakdown: {},
+      averageUsage: {},
+      churnRate: 0
+    };
+    
+    // Calculate metrics
+    data.forEach(user => {
+      metrics.tierBreakdown[user.subscription_tier] = 
+        (metrics.tierBreakdown[user.subscription_tier] || 0) + 1;
+    });
+    
+    return metrics;
+  }
+
+  async getRevenueMetrics() {
+    // This would integrate with Stripe reporting or our own revenue tracking
+    const { data } = await this.supabase
+      .from('subscription_events')
+      .select('amount, currency, created_at')
+      .eq('event_type', 'payment_succeeded');
+    
+    return data.reduce((acc, payment) => ({
+      totalRevenue: acc.totalRevenue + payment.amount,
+      paymentsCount: acc.paymentsCount + 1
+    }), { totalRevenue: 0, paymentsCount: 0 });
+  }
+}
+```
+
+## Error Handling and Recovery
+
+### 1. Subscription Error Handling
+```javascript
+// Common subscription errors and how to handle them
+const subscriptionErrors = {
+  'card_declined': {
+    message: 'Your card was declined. Please try a different payment method.',
+    action: 'update_payment_method'
+  },
+  'insufficient_funds': {
+    message: 'Insufficient funds. Please check your account balance.',
+    action: 'update_payment_method'
+  },
+  'expired_card': {
+    message: 'Your card has expired. Please update your payment information.',
+    action: 'update_payment_method'
+  },
+  'subscription_cancelled': {
+    message: 'Your subscription has been cancelled.',
+    action: 'reactivate_subscription'
+  }
+};
+```
+
+This comprehensive subscription management system will handle all aspects of our SaaS billing, from initial signup to tier upgrades, cancellations, and analytics.

@@ -1,0 +1,124 @@
+{
+  "source": "TipRanks Technical",
+  "category": "technical",
+  "url": "https://www.tipranks.com/stocks/nvda/technical-analysis",
+  "rawData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.tipranks.com/stocks/nvda/technical-analysis",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [
+      {
+        "date": "Thu, 28 Aug 2025 02:39:00 GMT",
+        "sentiment": 0,
+        "estimatedDate": "Thu, 28 Aug 2025 18:39:03 GMT",
+        "icon": "https://tr-cdn.tipranks.com/static/v2/static/images/logo/tipranks/favicon.ico",
+        "diffbotUri": "article|3|-620135199",
+        "siteName": "tipranks",
+        "type": "article",
+        "title": "Nvidia (NVDA) Technical Analysis",
+        "tags": [
+          {
+            "score": 0.9914658069610596,
+            "sentiment": 0.454,
+            "count": 10,
+            "label": "Nvidia",
+            "uri": "https://diffbot.com/entity/E9nQaOvC9MXaUzXCuN81tFQ",
+            "rdfTypes": [
+              "http://dbpedia.org/ontology/Organisation"
+            ]
+          },
+          {
+            "score": 0.9161298274993896,
+            "sentiment": 0,
+            "count": 1,
+            "label": "technical analysis",
+            "uri": "https://diffbot.com/entity/EUpJ8GYBSP46hCohrFEfEbw"
+          },
+          {
+            "score": 0.5814574956893921,
+            "sentiment": 0,
+            "count": 1,
+            "label": "exponential moving average",
+            "uri": "https://diffbot.com/entity/EJWo7dVGFMGCQKsh0d7LREQ"
+          }
+        ],
+        "humanLanguage": "en",
+        "pageUrl": "https://www.tipranks.com/stocks/nvda/technical-analysis",
+        "html": "<p>Nvidia&rsquo;s (NVDA) 20-Day exponential moving average is 177.68, while Nvidia&rsquo;s (NVDA) share price is $181.77, making it a Buy.</p>\n<p>Nvidia&rsquo;s (NVDA) 50-Day exponential moving average is 167.89, while Nvidia&rsquo;s (NVDA) share price is $181.77, making it a Buy.</p>",
+        "text": "Nvidia’s (NVDA) 20-Day exponential moving average is 177.68, while Nvidia’s (NVDA) share price is $181.77, making it a Buy.\nNvidia’s (NVDA) 50-Day exponential moving average is 167.89, while Nvidia’s (NVDA) share price is $181.77, making it a Buy."
+      }
+    ],
+    "type": "article",
+    "title": "Nvidia (NVDA) Technical Analysis - TipRanks.com"
+  },
+  "processedData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.tipranks.com/stocks/nvda/technical-analysis",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [
+      {
+        "date": "Thu, 28 Aug 2025 02:39:00 GMT",
+        "sentiment": 0,
+        "estimatedDate": "Thu, 28 Aug 2025 18:39:03 GMT",
+        "icon": "https://tr-cdn.tipranks.com/static/v2/static/images/logo/tipranks/favicon.ico",
+        "diffbotUri": "article|3|-620135199",
+        "siteName": "tipranks",
+        "type": "article",
+        "title": "Nvidia (NVDA) Technical Analysis",
+        "tags": [
+          {
+            "score": 0.9914658069610596,
+            "sentiment": 0.454,
+            "count": 10,
+            "label": "Nvidia",
+            "uri": "https://diffbot.com/entity/E9nQaOvC9MXaUzXCuN81tFQ",
+            "rdfTypes": [
+              "http://dbpedia.org/ontology/Organisation"
+            ]
+          },
+          {
+            "score": 0.9161298274993896,
+            "sentiment": 0,
+            "count": 1,
+            "label": "technical analysis",
+            "uri": "https://diffbot.com/entity/EUpJ8GYBSP46hCohrFEfEbw"
+          },
+          {
+            "score": 0.5814574956893921,
+            "sentiment": 0,
+            "count": 1,
+            "label": "exponential moving average",
+            "uri": "https://diffbot.com/entity/EJWo7dVGFMGCQKsh0d7LREQ"
+          }
+        ],
+        "humanLanguage": "en",
+        "pageUrl": "https://www.tipranks.com/stocks/nvda/technical-analysis",
+        "html": "<p>Nvidia&rsquo;s (NVDA) 20-Day exponential moving average is 177.68, while Nvidia&rsquo;s (NVDA) share price is $181.77, making it a Buy.</p>\n<p>Nvidia&rsquo;s (NVDA) 50-Day exponential moving average is 167.89, while Nvidia&rsquo;s (NVDA) share price is $181.77, making it a Buy.</p>",
+        "text": "Nvidia’s (NVDA) 20-Day exponential moving average is 177.68, while Nvidia’s (NVDA) share price is $181.77, making it a Buy.\nNvidia’s (NVDA) 50-Day exponential moving average is 167.89, while Nvidia’s (NVDA) share price is $181.77, making it a Buy."
+      }
+    ],
+    "type": "article",
+    "title": "Nvidia (NVDA) Technical Analysis - TipRanks.com"
+  },
+  "qualityScore": {
+    "overall": 8
+  },
+  "timestamp": "2025-08-28T19:21:14.910Z",
+  "status": "success",
+  "extractionMethod": "diffbot",
+  "attempt": 1,
+  "priority": "high",
+  "cachedAt": "2025-08-28T19:22:22.587Z"
+}

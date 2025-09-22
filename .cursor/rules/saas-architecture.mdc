@@ -1,0 +1,144 @@
+---
+alwaysApply: true
+description: Core SaaS architecture patterns for multi-tenancy and user management
+---
+
+# SaaS Architecture Guidelines
+
+This rule outlines the core architectural patterns for transforming the Market Intelligence Dashboard into a SaaS platform.
+
+## Core Principles
+
+### 1. Multi-Tenancy Architecture
+- **Database**: Use Row Level Security (RLS) in Supabase for automatic data isolation
+- **Code**: All database queries must include user context filtering
+- **Storage**: User-specific data stored with proper foreign key relationships
+
+### 2. Subscription Tiers
+- **Free Tier**: 10 LLM queries, basic features only
+- **Pro Tier ($100)**: 500 LLM queries, advanced analytics, custom dashboards
+- **Enterprise Tier ($200)**: Unlimited queries, API access, priority support
+
+### 3. Usage Tracking & Rate Limiting
+- **Pre-request Check**: Verify user quota before processing expensive operations
+- **Post-request Update**: Increment usage counters after successful operations
+- **Rate Limiting**: Apply different limits based on subscription tier
+
+## Key Components
+
+### Backend Structure
+```
+backend/src/
+├── middleware/
+│   ├── auth.js              # Authentication middleware
+│   └── rateLimiter.js       # Usage quota checking
+├── services/
+│   ├── auth/
+│   │   └── AuthService.js    # User authentication
+│   ├── subscription/
+│   │   └── SubscriptionService.js  # Stripe integration
+│   ├── usage/
+│   │   └── UsageTrackingService.js # Query tracking
+│   └── session/
+│       └── SessionService.js       # User session management
+└── routes/
+    ├── auth.js              # Authentication endpoints
+    └── subscription.js      # Subscription management
+```
+
+### Frontend Structure
+```
+src/
+├── components/
+│   ├── Auth/                # Login, Register, Profile
+│   └── Subscription/        # Upgrade, Billing, Usage
+├── hooks/
+│   ├── useAuth.ts          # Authentication state
+│   ├── useSubscription.ts  # Subscription management
+│   └── useUsage.ts         # Usage tracking
+└── services/
+    └── api.ts               # Enhanced with auth headers
+```
+
+## Implementation Patterns
+
+### 1. Database Query Pattern
+```javascript
+// ❌ Bad - No user context
+const { data } = await supabase.from('user_data').select('*');
+
+// ✅ Good - With user context
+const { data } = await supabase
+  .from('user_data')
+  .select('*')
+  .eq('user_id', userId);
+```
+
+### 2. API Endpoint Pattern
+```javascript
+// All API routes should:
+export const handler = async (req, res) => {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+  
+  // Check usage quota
+  const canProceed = await checkUserQuota(userId);
+  if (!canProceed) return res.status(429).json({ error: 'Quota exceeded' });
+  
+  // Process request
+  const result = await processRequest(req.body);
+  
+  // Track usage
+  await incrementUsage(userId, 'llm', tokensUsed);
+  
+  res.json(result);
+};
+```
+
+### 3. Component Pattern
+```tsx
+// All components should use auth context
+const MyComponent = () => {
+  const { user, subscription } = useAuth();
+  const { usage, loading } = useUsage();
+  
+  if (loading) return <LoadingSpinner />;
+  if (!user) return <LoginPrompt />;
+  
+  return (
+    <div>
+      <UsageBar current={usage.queries} limit={subscription.limit} />
+      <MainContent />
+    </div>
+  );
+};
+```
+
+## Security Considerations
+
+- **Authentication**: All routes require valid JWT tokens
+- **Authorization**: Check user permissions for sensitive operations
+- **Data Isolation**: Never allow cross-user data access
+- **Rate Limiting**: Prevent abuse with tier-appropriate limits
+
+## Error Handling
+
+- **401 Unauthorized**: Invalid or missing authentication
+- **403 Forbidden**: Valid auth but insufficient permissions
+- **429 Too Many Requests**: Usage quota exceeded
+- **402 Payment Required**: Subscription required for feature
+
+## Performance Optimization
+
+- **Caching**: Cache user profiles and subscription data
+- **Database**: Use proper indexing on user_id columns
+- **API**: Implement efficient batch operations where possible
+- **Frontend**: Lazy load subscription-specific features
+
+## Migration Strategy
+
+1. **Phase 1**: Add user tables and authentication
+2. **Phase 2**: Implement usage tracking and rate limiting
+3. **Phase 3**: Add subscription management
+4. **Phase 4**: Migrate existing data to user-specific structure
+5. **Phase 5**: Add premium features and tier differentiation

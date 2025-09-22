@@ -1,0 +1,44 @@
+{
+  "technical_analysis": {
+    "summary": "Major equity indices posted gains, led by the S&P 500 and Nasdaq, with moderate increases in oil and gold prices; yields rose slightly as risk appetite persisted across markets.",
+    "key_data_points": [
+      "S&P 500 rose 0.32% to 6501.86",
+      "Nasdaq increased 0.53% to 21705.16",
+      "Dow Jones climbed 0.16% to 45636.9",
+      "Russell 2000 rose 0.19% to 2378.41",
+      "Nikkei 225 gained 0.73% to 42828.79",
+      "FTSE 100 declined 0.42% to 9216.82",
+      "Hang Seng dropped 0.81% to 24998.82",
+      "US 10 Yr yield up 0.25% to 4.2%",
+      "Crude Oil increased 0.7% to 64.6",
+      "Gold rose 0.75% to 3474.3",
+      "Petco shares surged up to 31% after profit outlook revision"
+    ]
+  },
+  "non_technical_analysis": {
+    "summary": "Strong US economic growth and robust investment activity sustained bullish investor sentiment, yet tightening bond market risk premiums and geopolitical tensions in Eastern Europe highlight fragility beneath headline optimism; company turnarounds and technological investment remain potent narratives amid persistent caution.",
+    "event_drivers": [
+      {
+        "headline": "US Economy Expands at Revised 3.3% Rate on Stronger Investment",
+        "category": "Macroeconomic",
+        "reason_why": "Upward GDP revision was fueled by substantial business investment and declining imports, signaling resilient consumer demand and the catalytic influence of sectors like AI, despite lingering demand concerns and tariff impacts."
+      },
+      {
+        "headline": "Bond Market Bonanza Leaves Investors With Razor-Thin Safety Net",
+        "category": "Market Psychology",
+        "reason_why": "Investor optimism, FOMO, and excess liquidity caused credit spreads to historic lows, reducing compensation for risk and leaving markets exposed to sharp corrections if economic conditions deteriorate."
+      },
+      {
+        "headline": "Oil Rises as Waning Ukraine Peace Hopes Endanger Russian Supply",
+        "category": "Geopolitical",
+        "reason_why": "Escalating geopolitical tensions, notably sluggish peace talks and infrastructure attacks, threatened Russian crude supply, temporarily lifting oil prices despite analyst expectations for supply to outpace demand."
+      },
+      {
+        "headline": "Petco Jumps After Hiking Profit View as Turnaround Gains Steam",
+        "category": "Corporate Strategy",
+        "reason_why": "Petco’s profit outlook improved on successful operational turnaround initiatives, including cost discipline and strategic investments in high-growth areas, leading to significant share price appreciation despite soft sales."
+      }
+    ]
+  },
+  "overall_conclusion": "Markets are buoyed by strong economic performance, resilient consumer behavior, and targeted corporate transformations, reflected in solid index and asset gains; nonetheless, compressed credit spreads and mounting geopolitical risks introduce significant vulnerability. Strategic allocation toward technology and selective turnaround sectors is favored, yet vigilant risk management is essential to navigate potential shocks and ensure lasting outperformance."
+}

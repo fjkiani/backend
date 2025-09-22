@@ -1,0 +1,694 @@
+---
+globs: backend/src/services/subscription/*.js,backend/src/routes/subscription.js,src/components/Subscription/*.tsx,src/hooks/useSubscription.ts
+description: Subscription management and billing patterns for SaaS
+---
+
+# Subscription and Billing Patterns for SaaS
+
+This rule provides guidance for implementing subscription management, billing, and payment processing in the SaaS platform.
+
+## Stripe Integration Architecture
+
+### 1. Backend Stripe Service
+
+```javascript
+// backend/src/services/subscription/StripeService.js
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_KEY);
+
+export class StripeService {
+  constructor() {
+    this.stripe = stripe;
+    this.supabase = supabase;
+  }
+
+  // Create or retrieve customer
+  async getOrCreateCustomer(userId, email) {
+    try {
+      // Check if customer already exists
+      const { data: profile } = await this.supabase
+        .from('user_profiles')
+        .select('stripe_customer_id')
+        .eq('id', userId)
+        .single();
+
+      if (profile?.stripe_customer_id) {
+        return await this.stripe.customers.retrieve(profile.stripe_customer_id);
+      }
+
+      // Create new customer
+      const customer = await this.stripe.customers.create({
+        email,
+        metadata: { userId }
+      });
+
+      // Update user profile
+      await this.supabase
+        .from('user_profiles')
+        .update({ stripe_customer_id: customer.id })
+        .eq('id', userId);
+
+      return customer;
+    } catch (error) {
+      console.error('Error creating/retrieving customer:', error);
+      throw error;
+    }
+  }
+
+  // Create subscription
+  async createSubscription(userId, priceId) {
+    try {
+      const { data: profile } = await this.supabase
+        .from('user_profiles')
+        .select('email, stripe_customer_id')
+        .eq('id', userId)
+        .single();
+
+      const customer = await this.getOrCreateCustomer(userId, profile.email);
+
+      const subscription = await this.stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{ price: priceId }],
+        metadata: { userId },
+        payment_behavior: 'default_incomplete',
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      // Update user profile with subscription ID
+      await this.supabase
+        .from('user_profiles')
+        .update({ stripe_subscription_id: subscription.id })
+        .eq('id', userId);
+
+      return subscription;
+    } catch (error) {
+      console.error('Error creating subscription:', error);
+      throw error;
+    }
+  }
+
+  // Cancel subscription
+  async cancelSubscription(userId) {
+    try {
+      const { data: profile } = await this.supabase
+        .from('user_profiles')
+        .select('stripe_subscription_id')
+        .eq('id', userId)
+        .single();
+
+      if (!profile?.stripe_subscription_id) {
+        throw new Error('No active subscription found');
+      }
+
+      const subscription = await this.stripe.subscriptions.update(
+        profile.stripe_subscription_id,
+        { cancel_at_period_end: true }
+      );
+
+      return subscription;
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
+      throw error;
+    }
+  }
+
+  // Handle webhooks
+  async handleWebhook(event) {
+    try {
+      switch (event.type) {
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated':
+          await this.handleSubscriptionUpdate(event.data.object);
+          break;
+        case 'customer.subscription.deleted':
+          await this.handleSubscriptionCancellation(event.data.object);
+          break;
+        case 'invoice.payment_succeeded':
+          await this.handlePaymentSuccess(event.data.object);
+          break;
+        case 'invoice.payment_failed':
+          await this.handlePaymentFailure(event.data.object);
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling webhook:', error);
+      throw error;
+    }
+  }
+
+  async handleSubscriptionUpdate(subscription) {
+    const userId = subscription.metadata.userId;
+    const tier = this.getTierFromPriceId(subscription.items.data[0].price.id);
+    const queryLimit = this.getQueryLimitForTier(tier);
+
+    await this.supabase
+      .from('user_profiles')
+      .update({
+        subscription_tier: tier,
+        query_limit: queryLimit,
+        stripe_subscription_id: subscription.id
+      })
+      .eq('id', userId);
+  }
+
+  async handleSubscriptionCancellation(subscription) {
+    const userId = subscription.metadata.userId;
+
+    await this.supabase
+      .from('user_profiles')
+      .update({
+        subscription_tier: 'free',
+        query_limit: 10,
+        stripe_subscription_id: null
+      })
+      .eq('id', userId);
+  }
+
+  async handlePaymentSuccess(invoice) {
+    // Log successful payment
+    await this.supabase
+      .from('user_usage')
+      .insert({
+        user_id: invoice.subscription_details?.metadata?.userId,
+        query_type: 'payment',
+        cost: invoice.amount_paid / 100,
+        metadata: { invoice_id: invoice.id, description: 'Monthly subscription payment' }
+      });
+  }
+
+  async handlePaymentFailure(invoice) {
+    // Handle failed payment - could send email notification
+    console.log('Payment failed for invoice:', invoice.id);
+  }
+
+  getTierFromPriceId(priceId) {
+    const tierMap = {
+      [process.env.STRIPE_PRICE_PRO]: 'pro',
+      [process.env.STRIPE_PRICE_ENTERPRISE]: 'enterprise'
+    };
+    return tierMap[priceId] || 'free';
+  }
+
+  getQueryLimitForTier(tier) {
+    const limits = {
+      free: 10,
+      pro: 500,
+      enterprise: 999999 // Unlimited
+    };
+    return limits[tier] || 10;
+  }
+}
+```
+
+### 2. Subscription Management Routes
+
+```javascript
+// backend/src/routes/subscription.js
+import express from 'express';
+import { authenticateUser } from '../middleware/auth.js';
+import { StripeService } from '../services/subscription/StripeService.js';
+
+const router = express.Router();
+router.use(authenticateUser);
+
+const stripeService = new StripeService();
+
+// Create subscription
+router.post('/create', async (req, res) => {
+  try {
+    const { priceId } = req.body;
+    const userId = req.user.id;
+
+    const subscription = await stripeService.createSubscription(userId, priceId);
+
+    res.json({
+      subscriptionId: subscription.id,
+      clientSecret: subscription.latest_invoice.payment_intent.client_secret
+    });
+  } catch (error) {
+    console.error('Error creating subscription:', error);
+    res.status(500).json({ error: 'Failed to create subscription' });
+  }
+});
+
+// Get subscription status
+router.get('/status', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const { data: profile } = await req.supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profile.stripe_subscription_id) {
+      const subscription = await stripeService.stripe.subscriptions.retrieve(
+        profile.stripe_subscription_id
+      );
+
+      res.json({
+        hasSubscription: true,
+        tier: profile.subscription_tier,
+        status: subscription.status,
+        currentPeriodEnd: subscription.current_period_end,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end
+      });
+    } else {
+      res.json({
+        hasSubscription: false,
+        tier: 'free'
+      });
+    }
+  } catch (error) {
+    console.error('Error getting subscription status:', error);
+    res.status(500).json({ error: 'Failed to get subscription status' });
+  }
+});
+
+// Cancel subscription
+router.post('/cancel', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const subscription = await stripeService.cancelSubscription(userId);
+
+    res.json({
+      success: true,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end
+    });
+  } catch (error) {
+    console.error('Error canceling subscription:', error);
+    res.status(500).json({ error: 'Failed to cancel subscription' });
+  }
+});
+
+// Webhook endpoint
+router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  try {
+    const event = stripeService.stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    await stripeService.handleWebhook(event);
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(400).json({ error: 'Webhook error' });
+  }
+});
+
+export default router;
+```
+
+## Frontend Subscription Management
+
+### 1. Subscription Hook
+
+```typescript
+// src/hooks/useSubscription.ts
+import { useState, useEffect } from 'react';
+import { useAuth } from './useAuth';
+import { supabase } from '../services/supabase';
+
+interface SubscriptionData {
+  hasSubscription: boolean;
+  tier: string;
+  status?: string;
+  currentPeriodEnd?: number;
+  cancelAtPeriodEnd?: boolean;
+}
+
+export const useSubscription = () => {
+  const { user } = useAuth();
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      fetchSubscriptionStatus();
+    }
+  }, [user]);
+
+  const fetchSubscriptionStatus = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/subscription/status', {
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch subscription status');
+
+      const data = await response.json();
+      setSubscription(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch subscription');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createSubscription = async (priceId: string) => {
+    try {
+      const response = await fetch('/api/subscription/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({ priceId }),
+      });
+
+      if (!response.ok) throw new Error('Failed to create subscription');
+
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const cancelSubscription = async () => {
+    try {
+      const response = await fetch('/api/subscription/cancel', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to cancel subscription');
+
+      await fetchSubscriptionStatus(); // Refresh status
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  return {
+    subscription,
+    loading,
+    error,
+    createSubscription,
+    cancelSubscription,
+    refreshStatus: fetchSubscriptionStatus
+  };
+};
+```
+
+### 2. Subscription Components
+
+```typescript
+// src/components/Subscription/PricingCard.tsx
+import React from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { useSubscription } from '../../hooks/useSubscription';
+
+interface PricingCardProps {
+  tier: 'free' | 'pro' | 'enterprise';
+  name: string;
+  price: string;
+  features: string[];
+  priceId?: string;
+  queryLimit: number;
+}
+
+export const PricingCard: React.FC<PricingCardProps> = ({
+  tier,
+  name,
+  price,
+  features,
+  priceId,
+  queryLimit
+}) => {
+  const { user } = useAuth();
+  const { subscription, createSubscription } = useSubscription();
+  const [loading, setLoading] = useState(false);
+
+  const isCurrentTier = subscription?.tier === tier;
+  const canUpgrade = subscription && 
+    (tier === 'pro' && subscription.tier === 'free') || 
+    (tier === 'enterprise' && subscription.tier !== 'enterprise');
+
+  const handleSubscribe = async () => {
+    if (!priceId || !user) return;
+
+    try {
+      setLoading(true);
+      const subscriptionData = await createSubscription(priceId);
+      
+      // Redirect to Stripe Checkout or handle payment intent
+      // Implementation depends on your Stripe integration approach
+    } catch (error) {
+      console.error('Subscription error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={`border rounded-lg p-6 ${isCurrentTier ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+      <div className="text-center">
+        <h3 className="text-lg font-semibold">{name}</h3>
+        <p className="text-3xl font-bold">{price}</p>
+        <p className="text-gray-600">{queryLimit} queries/month</p>
+      </div>
+
+      <ul className="mt-4 space-y-2">
+        {features.map((feature, index) => (
+          <li key={index} className="flex items-center">
+            <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            {feature}
+          </li>
+        ))}
+      </ul>
+
+      <button
+        onClick={handleSubscribe}
+        disabled={loading || isCurrentTier || !canUpgrade}
+        className={`w-full mt-6 py-2 px-4 rounded-md font-medium ${
+          isCurrentTier
+            ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+            : canUpgrade
+            ? 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+        }`}
+      >
+        {loading ? 'Processing...' : 
+         isCurrentTier ? 'Current Plan' : 
+         canUpgrade ? 'Upgrade' : 'Contact Sales'}
+      </button>
+    </div>
+  );
+};
+```
+
+```typescript
+// src/components/Subscription/UsageDashboard.tsx
+import React from 'react';
+import { useUsage } from '../../hooks/useUsage';
+import { useSubscription } from '../../hooks/useSubscription';
+
+export const UsageDashboard: React.FC = () => {
+  const { usage, loading: usageLoading } = useUsage();
+  const { subscription, loading: subLoading } = useSubscription();
+
+  if (usageLoading || subLoading) {
+    return <div className="animate-pulse">Loading usage data...</div>;
+  }
+
+  if (!usage || !subscription) {
+    return <div>No usage data available</div>;
+  }
+
+  const usagePercentage = usage.usagePercentage;
+  const isNearLimit = usagePercentage > 80;
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h3 className="text-lg font-semibold mb-4">Usage Dashboard</h3>
+      
+      <div className="mb-4">
+        <div className="flex justify-between text-sm text-gray-600 mb-1">
+          <span>Queries Used</span>
+          <span>{usage.currentUsage} / {usage.limit}</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full ${isNearLimit ? 'bg-red-500' : 'bg-blue-500'}`}
+            style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+          ></div>
+        </div>
+      </div>
+
+      {isNearLimit && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4">
+          <p className="text-yellow-800 text-sm">
+            You're approaching your usage limit. Consider upgrading to continue using the service without interruption.
+          </p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <div className="text-2xl font-bold text-blue-600">{usage.remaining}</div>
+          <div className="text-sm text-gray-600">Remaining</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-green-600">{usage.tier}</div>
+          <div className="text-sm text-gray-600">Current Tier</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-purple-600">{usagePercentage.toFixed(0)}%</div>
+          <div className="text-sm text-gray-600">Used</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+```
+
+## Billing and Revenue Optimization
+
+### 1. Pricing Strategy
+
+```javascript
+// backend/src/config/pricing.js
+export const PRICING_TIERS = {
+  free: {
+    name: 'Free',
+    price: 0,
+    queries: 10,
+    features: [
+      '10 LLM queries per month',
+      'Basic news analysis',
+      'Economic calendar',
+      'Community support'
+    ]
+  },
+  pro: {
+    name: 'Pro',
+    price: 100,
+    queries: 500,
+    stripePriceId: process.env.STRIPE_PRICE_PRO,
+    features: [
+      '500 LLM queries per month',
+      'Advanced market analysis',
+      'Custom dashboards',
+      'Priority support',
+      'API access'
+    ]
+  },
+  enterprise: {
+    name: 'Enterprise',
+    price: 200,
+    queries: 999999, // Unlimited
+    stripePriceId: process.env.STRIPE_PRICE_ENTERPRISE,
+    features: [
+      'Unlimited queries',
+      'White-label options',
+      'Dedicated support',
+      'Custom integrations',
+      'Advanced analytics'
+    ]
+  }
+};
+```
+
+### 2. Usage Analytics for Business Intelligence
+
+```javascript
+// backend/src/services/analytics/UsageAnalyticsService.js
+export class UsageAnalyticsService {
+  constructor(supabase) {
+    this.supabase = supabase;
+  }
+
+  async getUsageAnalytics(timeframe = '30 days') {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(timeframe));
+
+    const { data: usage } = await this.supabase
+      .from('user_usage')
+      .select(`
+        *,
+        user_profiles!inner(subscription_tier, email)
+      `)
+      .gte('timestamp', startDate.toISOString());
+
+    // Analyze usage patterns
+    const analytics = {
+      totalQueries: usage.length,
+      queriesByType: this.groupBy(usage, 'query_type'),
+      revenueByTier: this.calculateRevenue(usage),
+      userRetention: await this.calculateRetention(),
+      mostPopularFeatures: this.getMostPopularFeatures(usage)
+    };
+
+    return analytics;
+  }
+
+  groupBy(array, key) {
+    return array.reduce((groups, item) => {
+      const group = groups[item[key]] || [];
+      group.push(item);
+      groups[item[key]] = group;
+      return groups;
+    }, {});
+  }
+
+  calculateRevenue(usage) {
+    return usage.reduce((revenue, item) => {
+      const tier = item.user_profiles.subscription_tier;
+      revenue[tier] = (revenue[tier] || 0) + (item.cost || 0);
+      return revenue;
+    }, {});
+  }
+
+  async calculateRetention() {
+    // Implementation for calculating user retention metrics
+    // This would involve complex SQL queries to determine active users over time
+  }
+
+  getMostPopularFeatures(usage) {
+    const featureCount = usage.reduce((count, item) => {
+      count[item.query_type] = (count[item.query_type] || 0) + 1;
+      return count;
+    }, {});
+
+    return Object.entries(featureCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10);
+  }
+}
+```
+
+## Security and Compliance
+
+### 1. Payment Security
+- Use Stripe's secure payment forms
+- Implement PCI compliance measures
+- Encrypt sensitive customer data
+- Regular security audits
+
+### 2. Data Privacy
+- Implement GDPR compliance
+- Provide data export/deletion options
+- Secure customer data storage
+- Transparent privacy policies
+
+### 3. Business Operations
+- Set up proper accounting and invoicing
+- Implement tax collection for different regions
+- Create refund and cancellation policies
+- Establish customer support processes
+
+This comprehensive subscription system will provide a solid foundation for monetizing your SaaS platform while ensuring a great user experience and maintaining security and compliance standards.

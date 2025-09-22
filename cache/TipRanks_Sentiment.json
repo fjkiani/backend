@@ -1,0 +1,528 @@
+{
+  "source": "TipRanks Sentiment",
+  "category": "sentiment",
+  "url": "https://www.tipranks.com/stocks/nvda/stock-investors",
+  "rawData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.tipranks.com/stocks/nvda/stock-investors",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [
+      {
+        "diffbotUri": "list|3|-1496144842",
+        "icon": "https://tr-cdn.tipranks.com/static/v2/static/images/logo/tipranks/favicon.ico",
+        "pageUrl": "https://www.tipranks.com/stocks/nvda/stock-investors",
+        "type": "list",
+        "title": "Nvidia (NVDA) Stock Investors Activity & Sentiment",
+        "items": [
+          {
+            "date": "Wed, 21 May 2025 00:00:00 GMT",
+            "summary": "21.5% of all portfolios hold NVDA\n\n\n\nOn average, investors allocate 12.39% of their portfolios to NVDA",
+            "title": "Average Holdings Size"
+          },
+          {
+            "summary": "Based on the activity of 815,092 investors in the recent quarter",
+            "title": "Investor Sentiment"
+          },
+          {
+            "date": "Thu, 21 Aug 2025 00:00:00 GMT",
+            "summary": "Percentages indicate the change in the number of portfolios holding NVDA, out of 815,092 portfolios.",
+            "title": "Portfolios Holding NVDA"
+          },
+          {
+            "summary": "Action\n\n\nAny",
+            "title": "Action"
+          },
+          {
+            "summary": "Investor Performance\n\n\nAny",
+            "title": "Investor Performance"
+          },
+          {
+            "summary": "Investor Profile",
+            "title": "Investor Profile"
+          },
+          {
+            "summary": "Investor Action",
+            "title": "Investor Action"
+          },
+          {
+            "summary": "Transaction Date",
+            "title": "Transaction Date"
+          },
+          {
+            "summary": "Portfolio Allocation",
+            "title": "Portfolio Allocation"
+          },
+          {
+            "summary": "Execution Price",
+            "title": "Execution Price"
+          },
+          {
+            "summary": "Follow",
+            "title": "Follow"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1676103/brian-t-henderson",
+            "title": "HENDERSON HEDGE 25"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1676104/brian-t-henderson",
+            "title": "HENDERSON HEDGE 25"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1793648/thanathon-tumphimai",
+            "title": "9186640E"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1758843/scott-l-goodling",
+            "title": "Scott L Goodling"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1517072/elliot-whyte",
+            "title": "Elliot Whyte"
+          },
+          {
+            "date": "Fri, 28 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1740414/hee-jae-an",
+            "title": "Hee-Jae An"
+          },
+          {
+            "date": "Fri, 28 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1300906/analyzer",
+            "title": "Analyzer"
+          },
+          {
+            "date": "Fri, 28 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1305683/hartano",
+            "title": "N/A"
+          },
+          {
+            "date": "Fri, 28 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1620204/growth-stocks",
+            "title": "Growth Stocks"
+          },
+          {
+            "date": "Sat, 01 Mar 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/892782/taocapital",
+            "title": "N/A"
+          },
+          {
+            "title": "Based on the activity of"
+          },
+          {
+            "title": "investors who made their"
+          },
+          {
+            "summary": "Name",
+            "title": "Name"
+          },
+          {
+            "summary": "Average Holding Size",
+            "title": "Average Holding Size"
+          },
+          {
+            "summary": "Last 7D Change",
+            "title": "Last 7D Change"
+          },
+          {
+            "summary": "Last 30D Change",
+            "title": "Last 30D Change"
+          },
+          {
+            "summary": "Market Cap",
+            "title": "Market Cap"
+          },
+          {
+            "summary": "Sector",
+            "title": "Sector"
+          },
+          {
+            "summary": "3M Behavior",
+            "title": "3M Behavior"
+          },
+          {
+            "summary": "Follow",
+            "title": "Follow"
+          },
+          {
+            "date": "Mon, 03 Mar 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/xyz/stock-investors",
+            "title": "Technology"
+          },
+          {
+            "date": "Mon, 05 May 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/nio/stock-investors",
+            "title": "Consumer Cyclical"
+          },
+          {
+            "link": "https://www.tipranks.com/stocks/shop/stock-investors",
+            "title": "Technology"
+          },
+          {
+            "date": "Tue, 03 Jun 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/isrg/stock-investors",
+            "title": "Healthcare"
+          },
+          {
+            "date": "Mon, 03 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/zs/stock-investors",
+            "title": "Technology"
+          },
+          {
+            "link": "https://www.tipranks.com/stocks/dis/stock-investors",
+            "title": "Communication Services"
+          },
+          {
+            "date": "Sat, 03 May 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/lulu/stock-investors",
+            "title": "Consumer Cyclical"
+          },
+          {
+            "link": "https://www.tipranks.com/stocks/f/stock-investors",
+            "title": "Consumer Cyclical"
+          },
+          {
+            "date": "Tue, 04 Mar 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/pypl/stock-investors",
+            "title": "Financial"
+          },
+          {
+            "link": "https://www.tipranks.com/stocks/cat/stock-investors",
+            "title": "Industrials"
+          },
+          {
+            "title": "815,092"
+          },
+          {
+            "title": "active portfolios"
+          },
+          {
+            "date": "Tue, 29 Jul 2025 00:00:00 GMT",
+            "title": "Under 35"
+          },
+          {
+            "date": "Tue, 29 Jul 2025 00:00:00 GMT",
+            "summary": "Between 35–55\n\n0.3%\nLast 30 days\nHoldings Change\n\n\n46.5%\nof NVDA holders\nare between 35–55\n\nAverage Segment Performance",
+            "title": "Between 35–55"
+          },
+          {
+            "date": "Tue, 29 Jul 2025 00:00:00 GMT",
+            "summary": "38.6%\nof NVDA holders\nare over 55",
+            "title": "Over 55"
+          },
+          {
+            "summary": "How many retail Investors hold NVDA?",
+            "title": "How many retail Investors hold NVDA?"
+          },
+          {
+            "summary": "What is NVDA Investor Sentiment?",
+            "title": "What is NVDA Investor Sentiment?"
+          },
+          {
+            "summary": "What percentage of retail investors changed their holding of NVDA in the last 7 days?",
+            "title": "What percentage of retail investors changed their holding of NVDA in the last 7 days?"
+          },
+          {
+            "summary": "What percentage of retail investors changed their holding of NVDA in the last 30 days?",
+            "title": "What percentage of retail investors changed their holding of NVDA in the last 30 days?"
+          },
+          {
+            "summary": "What is the average age of retail investors who hold NVDA?",
+            "title": "What is the average age of retail investors who hold NVDA?"
+          },
+          {
+            "summary": "What other stocks have NVDA investors also bought?",
+            "title": "What other stocks have NVDA investors also bought?"
+          },
+          {
+            "link": "https://lp.tipranks.com/go-pro-v2?custom18=stocks__ticker_stock_investors&llf=stock-page-banner",
+            "title": "Become an Expert with TipRanks Premium"
+          },
+          {
+            "summary": "What am I Missing?\n\nMake informed decisions based on Top Analysts' activity\n\nKnow what industry insiders are buying\n\nGet actionable alerts from top Wall Street Analysts\n\nFind out before anyone else which stock is going to shoot up\n\n\nGet powerful stock screeners & detailed portfolio analysis\n\n\nSubscribe NowSee Plans & Pricing",
+            "link": "https://www.tipranks.com/plans?custom18=stocks__ticker_stock_investors&llf=stock-page-bottom-banner",
+            "title": "What am I Missing?"
+          }
+        ]
+      }
+    ],
+    "type": "list",
+    "title": "Nvidia (NVDA) Stock Investors Activity & Sentiment - TipRanks.com"
+  },
+  "processedData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.tipranks.com/stocks/nvda/stock-investors",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [
+      {
+        "diffbotUri": "list|3|-1496144842",
+        "icon": "https://tr-cdn.tipranks.com/static/v2/static/images/logo/tipranks/favicon.ico",
+        "pageUrl": "https://www.tipranks.com/stocks/nvda/stock-investors",
+        "type": "list",
+        "title": "Nvidia (NVDA) Stock Investors Activity & Sentiment",
+        "items": [
+          {
+            "date": "Wed, 21 May 2025 00:00:00 GMT",
+            "summary": "21.5% of all portfolios hold NVDA\n\n\n\nOn average, investors allocate 12.39% of their portfolios to NVDA",
+            "title": "Average Holdings Size"
+          },
+          {
+            "summary": "Based on the activity of 815,092 investors in the recent quarter",
+            "title": "Investor Sentiment"
+          },
+          {
+            "date": "Thu, 21 Aug 2025 00:00:00 GMT",
+            "summary": "Percentages indicate the change in the number of portfolios holding NVDA, out of 815,092 portfolios.",
+            "title": "Portfolios Holding NVDA"
+          },
+          {
+            "summary": "Action\n\n\nAny",
+            "title": "Action"
+          },
+          {
+            "summary": "Investor Performance\n\n\nAny",
+            "title": "Investor Performance"
+          },
+          {
+            "summary": "Investor Profile",
+            "title": "Investor Profile"
+          },
+          {
+            "summary": "Investor Action",
+            "title": "Investor Action"
+          },
+          {
+            "summary": "Transaction Date",
+            "title": "Transaction Date"
+          },
+          {
+            "summary": "Portfolio Allocation",
+            "title": "Portfolio Allocation"
+          },
+          {
+            "summary": "Execution Price",
+            "title": "Execution Price"
+          },
+          {
+            "summary": "Follow",
+            "title": "Follow"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1676103/brian-t-henderson",
+            "title": "HENDERSON HEDGE 25"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1676104/brian-t-henderson",
+            "title": "HENDERSON HEDGE 25"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1793648/thanathon-tumphimai",
+            "title": "9186640E"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1758843/scott-l-goodling",
+            "title": "Scott L Goodling"
+          },
+          {
+            "date": "Thu, 27 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1517072/elliot-whyte",
+            "title": "Elliot Whyte"
+          },
+          {
+            "date": "Fri, 28 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1740414/hee-jae-an",
+            "title": "Hee-Jae An"
+          },
+          {
+            "date": "Fri, 28 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1300906/analyzer",
+            "title": "Analyzer"
+          },
+          {
+            "date": "Fri, 28 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1305683/hartano",
+            "title": "N/A"
+          },
+          {
+            "date": "Fri, 28 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/1620204/growth-stocks",
+            "title": "Growth Stocks"
+          },
+          {
+            "date": "Sat, 01 Mar 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/experts/investors/892782/taocapital",
+            "title": "N/A"
+          },
+          {
+            "title": "Based on the activity of"
+          },
+          {
+            "title": "investors who made their"
+          },
+          {
+            "summary": "Name",
+            "title": "Name"
+          },
+          {
+            "summary": "Average Holding Size",
+            "title": "Average Holding Size"
+          },
+          {
+            "summary": "Last 7D Change",
+            "title": "Last 7D Change"
+          },
+          {
+            "summary": "Last 30D Change",
+            "title": "Last 30D Change"
+          },
+          {
+            "summary": "Market Cap",
+            "title": "Market Cap"
+          },
+          {
+            "summary": "Sector",
+            "title": "Sector"
+          },
+          {
+            "summary": "3M Behavior",
+            "title": "3M Behavior"
+          },
+          {
+            "summary": "Follow",
+            "title": "Follow"
+          },
+          {
+            "date": "Mon, 03 Mar 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/xyz/stock-investors",
+            "title": "Technology"
+          },
+          {
+            "date": "Mon, 05 May 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/nio/stock-investors",
+            "title": "Consumer Cyclical"
+          },
+          {
+            "link": "https://www.tipranks.com/stocks/shop/stock-investors",
+            "title": "Technology"
+          },
+          {
+            "date": "Tue, 03 Jun 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/isrg/stock-investors",
+            "title": "Healthcare"
+          },
+          {
+            "date": "Mon, 03 Feb 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/zs/stock-investors",
+            "title": "Technology"
+          },
+          {
+            "link": "https://www.tipranks.com/stocks/dis/stock-investors",
+            "title": "Communication Services"
+          },
+          {
+            "date": "Sat, 03 May 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/lulu/stock-investors",
+            "title": "Consumer Cyclical"
+          },
+          {
+            "link": "https://www.tipranks.com/stocks/f/stock-investors",
+            "title": "Consumer Cyclical"
+          },
+          {
+            "date": "Tue, 04 Mar 2025 00:00:00 GMT",
+            "link": "https://www.tipranks.com/stocks/pypl/stock-investors",
+            "title": "Financial"
+          },
+          {
+            "link": "https://www.tipranks.com/stocks/cat/stock-investors",
+            "title": "Industrials"
+          },
+          {
+            "title": "815,092"
+          },
+          {
+            "title": "active portfolios"
+          },
+          {
+            "date": "Tue, 29 Jul 2025 00:00:00 GMT",
+            "title": "Under 35"
+          },
+          {
+            "date": "Tue, 29 Jul 2025 00:00:00 GMT",
+            "summary": "Between 35–55\n\n0.3%\nLast 30 days\nHoldings Change\n\n\n46.5%\nof NVDA holders\nare between 35–55\n\nAverage Segment Performance",
+            "title": "Between 35–55"
+          },
+          {
+            "date": "Tue, 29 Jul 2025 00:00:00 GMT",
+            "summary": "38.6%\nof NVDA holders\nare over 55",
+            "title": "Over 55"
+          },
+          {
+            "summary": "How many retail Investors hold NVDA?",
+            "title": "How many retail Investors hold NVDA?"
+          },
+          {
+            "summary": "What is NVDA Investor Sentiment?",
+            "title": "What is NVDA Investor Sentiment?"
+          },
+          {
+            "summary": "What percentage of retail investors changed their holding of NVDA in the last 7 days?",
+            "title": "What percentage of retail investors changed their holding of NVDA in the last 7 days?"
+          },
+          {
+            "summary": "What percentage of retail investors changed their holding of NVDA in the last 30 days?",
+            "title": "What percentage of retail investors changed their holding of NVDA in the last 30 days?"
+          },
+          {
+            "summary": "What is the average age of retail investors who hold NVDA?",
+            "title": "What is the average age of retail investors who hold NVDA?"
+          },
+          {
+            "summary": "What other stocks have NVDA investors also bought?",
+            "title": "What other stocks have NVDA investors also bought?"
+          },
+          {
+            "link": "https://lp.tipranks.com/go-pro-v2?custom18=stocks__ticker_stock_investors&llf=stock-page-banner",
+            "title": "Become an Expert with TipRanks Premium"
+          },
+          {
+            "summary": "What am I Missing?\n\nMake informed decisions based on Top Analysts' activity\n\nKnow what industry insiders are buying\n\nGet actionable alerts from top Wall Street Analysts\n\nFind out before anyone else which stock is going to shoot up\n\n\nGet powerful stock screeners & detailed portfolio analysis\n\n\nSubscribe NowSee Plans & Pricing",
+            "link": "https://www.tipranks.com/plans?custom18=stocks__ticker_stock_investors&llf=stock-page-bottom-banner",
+            "title": "What am I Missing?"
+          }
+        ]
+      }
+    ],
+    "type": "list",
+    "title": "Nvidia (NVDA) Stock Investors Activity & Sentiment - TipRanks.com"
+  },
+  "qualityScore": {
+    "overall": 8
+  },
+  "timestamp": "2025-08-28T19:21:31.847Z",
+  "status": "success",
+  "extractionMethod": "diffbot",
+  "attempt": 1,
+  "priority": "medium",
+  "cachedAt": "2025-08-28T19:22:22.587Z"
+}

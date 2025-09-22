@@ -1,0 +1,30 @@
+---
+description: "Hyperbolic DeepSeek-V3 integration pattern for Zeta Brain"
+---
+
+## Hyperbolic LLM Integration (DeepSeek-V3)
+
+Central brain implementation: [zeta_missions/4_intelligence_synthesis.js](mdc:zeta_missions/4_intelligence_synthesis.js)
+
+### Environment
+- Preferred: set `HYPERBOLIC_API_KEY` in env
+- Fallback: code includes a default for rapid prototyping
+
+### Request Pattern
+- Endpoint: `https://api.hyperbolic.xyz/v1/chat/completions`
+- Model: `deepseek-ai/DeepSeek-V3`
+- Messages: system prompt enforces single clean JSON in response; user prompt provides task
+- Params: `max_tokens`, `temperature`, `top_p`
+
+### Response Parsing
+- Strip any accidental markdown fences, then `JSON.parse`
+- Function: `parseLLMResponse()` already handles this
+
+### Usage
+- Import: `import ZetaBrainAgent from 'zeta_missions/4_intelligence_synthesis.js'`
+- Call `await brain.generate(prompt)` then `brain.parseLLMResponse(text)`
+
+### Reliability Notes
+- Prefer pre-filtering (keywords/tickers/limits) to reduce token usage
+- Keep prompts concise and enforce “single JSON object, no markdown”
+

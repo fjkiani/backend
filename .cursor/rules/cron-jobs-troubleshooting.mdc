@@ -1,0 +1,134 @@
+---
+description: Troubleshooting doctrine for cron job failures and endpoint connectivity issues
+globs: backend/**/*.js,backend/**/*.ts,backend/**/*.json
+---
+
+# Cron Jobs Troubleshooting Doctrine
+
+## Issue: Cron Jobs Returning 404 or Pointing to Wrong Endpoints
+
+### Root Cause Analysis
+When automated cron jobs fail to trigger or return 404 errors, the most common causes are:
+
+1. **Wrong Backend URL** - Cron jobs pointing to old/deleted deployments
+2. **HTTP Method Mismatch** - Using GET instead of POST for endpoints
+3. **Import/Module Issues** - File extension inconsistencies (.mjs vs .js)
+4. **Route Registration Problems** - Routes not properly loaded in serverless environment
+
+### Diagnostic Steps
+
+**Step 1: Check Current Backend URL**
+```bash
+curl -s "https://your-backend-url.vercel.app/api/health" | cat
+```
+
+**Step 2: Test Schedule Endpoints Directly**
+```bash
+# Test with POST (correct method)
+curl -X POST "https://your-backend-url.vercel.app/api/schedule/run-minute-scrape?frequency=high" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json"
+
+# DON'T use GET - this will return 404
+curl -X GET "https://your-backend-url.vercel.app/api/schedule/run-minute-scrape?frequency=high"
+```
+
+**Step 3: Verify Route Registration**
+- Check server.js for proper import statements
+- Ensure schedule routes are registered: `app.use('/api/schedule', scheduleRoutes)`
+- Verify file extensions are consistent (.js, not .mjs)
+
+### Resolution Steps
+
+**1. Fix File Extension Issues**
+```bash
+# Convert .mjs to .js for consistency
+mv src/services/news/scheduler.mjs src/services/news/scheduler.js
+
+# Update import in server.js
+# Change: import { NewsScheduler } from './services/news/scheduler.mjs';
+# To:     import { NewsScheduler } from './services/news/scheduler.js';
+```
+
+**2. Redeploy Backend**
+```bash
+cd backend && vercel --prod --yes --force
+```
+
+**3. Update Supabase Cron Jobs**
+Run these SQL commands in Supabase SQL Editor:
+
+```sql
+-- Update high frequency job
+SELECT cron.alter_job(
+  job_id := 35,
+  command := $cmd$
+    SELECT net.http_post(
+      url := 'https://YOUR-CURRENT-BACKEND-URL.vercel.app/api/schedule/run-minute-scrape?frequency=high',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer YOUR_AUTH_TOKEN'
+      ),
+      timeout_milliseconds := 25000
+    );
+  $cmd$
+);
+
+-- Update low frequency job
+SELECT cron.alter_job(
+  job_id := 36,
+  command := $cmd$
+    SELECT net.http_post(
+      url := 'https://YOUR-CURRENT-BACKEND-URL.vercel.app/api/schedule/run-minute-scrape?frequency=low',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer YOUR_AUTH_TOKEN'
+      ),
+      timeout_milliseconds := 55000
+    );
+  $cmd$
+);
+```
+
+**4. Verify Data Collection**
+```bash
+# Check recent articles
+curl -s "https://your-backend-url.vercel.app/api/news" | head -20
+
+# Look for recent timestamps
+curl -s "https://your-backend-url.vercel.app/api/news" | grep -o '"published_at":"[^"]*"'
+```
+
+### Prevention Measures
+
+1. **Use Environment Variables** for backend URLs in cron job configurations
+2. **Implement Health Checks** before cron job execution
+3. **Monitor Cron Job Logs** in Supabase dashboard
+4. **Test Endpoints Manually** after deployments
+5. **Keep File Extensions Consistent** across the codebase
+
+### Success Indicators
+
+✅ **Cron jobs return `{"ok":true,"skipped":"locked","frequency":"high/low"}`** (indicates working but already running)
+✅ **Recent articles appear** with current timestamps in the database
+✅ **No 404 errors** when testing endpoints directly
+✅ **Health endpoint responds** with `{"status":"ok"}`
+
+### Related Issues
+
+- **Issue**: Backend redeployment changes Vercel URLs
+- **Solution**: Update all cron jobs with new URL after deployment
+
+- **Issue**: Mixed .mjs and .js files cause import errors
+- **Solution**: Standardize on .js extensions for consistency
+
+- **Issue**: Cron jobs use wrong HTTP method
+- **Solution**: Always use POST for schedule endpoints, never GET
+
+### Documentation Links
+
+- [Vercel Deployment Guide](mdc:vercel.json)
+- [Schedule Routes Implementation](mdc:backend/src/routes/scheduleRoutes.js)
+- [Server Configuration](mdc:backend/src/server.js)
+
+This doctrine was created after successfully resolving a cron job connectivity issue where automated news scraping failed due to URL mismatches and HTTP method errors.

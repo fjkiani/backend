@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Loader2, AlertCircle, CalendarDays, Clock, CheckCircle, ArrowRight, Star, Info, MessageSquare } from 'lucide-react';
 import { useMarketContext } from '../../hooks/useMarketContext';
-import { config } from '../../config';
+import { BACKEND_CONFIG } from '../../services/backend/config';
 
 // Define an interface for the expected event structure based on API sample
 interface CalendarEvent {
@@ -159,7 +159,7 @@ export const EconomicCalendar: React.FC = () => {
             setInterpretationError(null);
             // Use dates from dateRangeDetails based on selectedRange
             const { start, end } = dateRangeDetails; 
-            const url = `${config.BACKEND_URL}/api/calendar/events?from=${start}&to=${end}`; // Removed countries param
+            const url = `${BACKEND_CONFIG.BASE_URL}/api/calendar/events?from=${start}&to=${end}`; // Removed countries param
 
             try {
                 console.info(`Fetching calendar events from: ${url}`);
@@ -218,7 +218,7 @@ export const EconomicCalendar: React.FC = () => {
         const contextToSend = overallMarketContext || "Overall market context was not available.";
 
         try {
-            const response = await fetch(`${config.BACKEND_URL}/api/calendar/interpret-event`, {
+            const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/calendar/interpret-event`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

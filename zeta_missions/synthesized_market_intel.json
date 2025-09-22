@@ -1,0 +1,75 @@
+{
+  "overall_market_sentiment": "Bullish, with major equity indices rising on strong economic signals.",
+  "major_indices": {
+    "S&P 500": {
+      "value": 6501.86,
+      "change_percent": 0.32
+    },
+    "Nasdaq": {
+      "value": 21705.16,
+      "change_percent": 0.53
+    },
+    "Dow Jones": {
+      "value": 45636.9,
+      "change_percent": 0.16
+    },
+    "FTSE 100": {
+      "value": 9216.82,
+      "change_percent": -0.42
+    },
+    "Russell 2000": {
+      "value": 2378.41,
+      "change_percent": 0.19
+    },
+    "Nikkei 225": {
+      "value": 42828.79,
+      "change_percent": 0.73
+    },
+    "Hang Seng": {
+      "value": 24998.82,
+      "change_percent": -0.81
+    },
+    "DAX": {
+      "value": 24039.92,
+      "change_percent": -0.03
+    },
+    "Bloomberg 500": {
+      "value": 2354.88,
+      "change_percent": 0.36
+    },
+    "US 10 Yr": {
+      "yield": 4.2,
+      "change_percent": 0.25
+    },
+    "Crude Oil": {
+      "value": 64.6,
+      "change_percent": 0.7
+    },
+    "Gold": {
+      "value": 3474.3,
+      "change_percent": 0.75
+    },
+    "Euro": {
+      "value": 1.1679,
+      "change_percent": -0.03
+    },
+    "Pound/Dollar": {
+      "value": 1.3512,
+      "change_percent": -0.01
+    }
+  },
+  "top_headlines": [
+    "S&P 500 Tops 6,500 on Signs Economy in Good Shape",
+    "US Economy Expands at Revised 3.3% Rate on Stronger Investment",
+    "Bond Market Bonanza Leaves Investors With Razor-Thin Safety Net",
+    "Oil Rises as Waning Ukraine Peace Hopes Endanger Russian Supply",
+    "Petco Jumps After Hiking Profit View as Turnaround Gains Steam"
+  ],
+  "key_market_movers": [
+    "Petco (significant jump after profit outlook raised)",
+    "Crude Oil (up 0.7%, supported by geopolitical risk)",
+    "Gold (up 0.75%, demand remains strong)",
+    "McAfee (newsworthy redemption of preferred shares)",
+    "Soyoil (falling for fourth day on biofuels concerns)"
+  ]
+}

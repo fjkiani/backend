@@ -1,0 +1,25 @@
+{
+  "missions": [
+    {
+      "mission_id": "TIDE_MONETARY_POLICY",
+      "tier": "Tier1_Macro",
+      "category": "Monetary_Policy",
+      "target": "Federal Reserve US Interest Rate Decision",
+      "infiltration_point": "https://www.bloomberg.com/search?query=federal%20reserve%20interest%20rate"
+    },
+    {
+      "mission_id": "CURRENT_SEMICONDUCTORS",
+      "tier": "Tier2_Sector",
+      "category": "Technological_Shifts",
+      "target": "Semiconductor Industry Supply Chain",
+      "infiltration_point": "https://www.bloomberg.com/search?query=semiconductor%20supply%20chain"
+    },
+    {
+      "mission_id": "FISH_GME_EARNINGS",
+      "tier": "Tier3_Micro",
+      "category": "Corporate_Earnings",
+      "target": "GME",
+      "infiltration_point": "https://www.bloomberg.com/search?query=gamestop%20earnings"
+    }
+  ]
+}

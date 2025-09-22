@@ -1,0 +1,162 @@
+{
+  "source": "TradingView Technicals",
+  "category": "technical",
+  "url": "https://www.tradingview.com/symbols/NASDAQ-NVDA/technicals/",
+  "rawData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.tradingview.com/symbols/NASDAQ-NVDA/technicals/",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [
+      {
+        "image": "https://s3-symbol-logo.tradingview.com/nvidia--big.svg",
+        "types": [
+          "Organization"
+        ],
+        "images": [
+          {
+            "naturalHeight": 56,
+            "width": 168,
+            "url": "https://s3-symbol-logo.tradingview.com/nvidia--big.svg",
+            "naturalWidth": 56,
+            "primary": true,
+            "height": 168
+          },
+          {
+            "naturalHeight": 56,
+            "width": 168,
+            "url": "https://s3-symbol-logo.tradingview.com/nvidia--big.svg",
+            "naturalWidth": 56,
+            "primary": false,
+            "height": 168
+          },
+          {
+            "naturalHeight": 91,
+            "width": 1280,
+            "url": "https://static.tradingview.com/static/bundles/look-first-light.74b5bba06f657157cdb4.svg",
+            "naturalWidth": 1280,
+            "primary": false,
+            "height": 91
+          }
+        ],
+        "nbActiveEmployeeEdges": 0,
+        "importance": 0,
+        "origin": "tradingview.com/symbols/NASDAQ-NVDA/technicals",
+        "diffbotUri": "http://diffbot.com/entity/noId22793",
+        "nbIncomingEdges": 0,
+        "description": "Which technical analysis tools can be used to analyze NVIDIA Corporation? Check out various oscillators, moving averages and other technical indicators on TradingView.",
+        "allUris": [
+          "tradingview.com/symbols/NASDAQ-NVDA/technicals",
+          "facebook.com/tradingview",
+          "youtube.com/@TradingView",
+          "instagram.com/tradingview",
+          "linkedin.com/company/tradingview"
+        ],
+        "type": "organization",
+        "name": "NVIDIA Corporation",
+        "origins": [
+          "tradingview.com/symbols/NASDAQ-NVDA/technicals"
+        ],
+        "pageUrl": "https://www.tradingview.com/symbols/NASDAQ-NVDA/technicals/",
+        "id": "noId22793",
+        "allOriginHashes": [
+          "PMwKqbutMVCctkF3SPqe0w"
+        ],
+        "crawlTimestamp": 1488326400,
+        "linkedInUri": "linkedin.com/company/tradingview",
+        "facebookUri": "facebook.com/tradingview",
+        "nbOrigins": 1
+      }
+    ],
+    "type": "organization",
+    "title": "Technical Analysis of NVIDIA Corporation (NASDAQ:NVDA) — TradingView"
+  },
+  "processedData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.tradingview.com/symbols/NASDAQ-NVDA/technicals/",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [
+      {
+        "image": "https://s3-symbol-logo.tradingview.com/nvidia--big.svg",
+        "types": [
+          "Organization"
+        ],
+        "images": [
+          {
+            "naturalHeight": 56,
+            "width": 168,
+            "url": "https://s3-symbol-logo.tradingview.com/nvidia--big.svg",
+            "naturalWidth": 56,
+            "primary": true,
+            "height": 168
+          },
+          {
+            "naturalHeight": 56,
+            "width": 168,
+            "url": "https://s3-symbol-logo.tradingview.com/nvidia--big.svg",
+            "naturalWidth": 56,
+            "primary": false,
+            "height": 168
+          },
+          {
+            "naturalHeight": 91,
+            "width": 1280,
+            "url": "https://static.tradingview.com/static/bundles/look-first-light.74b5bba06f657157cdb4.svg",
+            "naturalWidth": 1280,
+            "primary": false,
+            "height": 91
+          }
+        ],
+        "nbActiveEmployeeEdges": 0,
+        "importance": 0,
+        "origin": "tradingview.com/symbols/NASDAQ-NVDA/technicals",
+        "diffbotUri": "http://diffbot.com/entity/noId22793",
+        "nbIncomingEdges": 0,
+        "description": "Which technical analysis tools can be used to analyze NVIDIA Corporation? Check out various oscillators, moving averages and other technical indicators on TradingView.",
+        "allUris": [
+          "tradingview.com/symbols/NASDAQ-NVDA/technicals",
+          "facebook.com/tradingview",
+          "youtube.com/@TradingView",
+          "instagram.com/tradingview",
+          "linkedin.com/company/tradingview"
+        ],
+        "type": "organization",
+        "name": "NVIDIA Corporation",
+        "origins": [
+          "tradingview.com/symbols/NASDAQ-NVDA/technicals"
+        ],
+        "pageUrl": "https://www.tradingview.com/symbols/NASDAQ-NVDA/technicals/",
+        "id": "noId22793",
+        "allOriginHashes": [
+          "PMwKqbutMVCctkF3SPqe0w"
+        ],
+        "crawlTimestamp": 1488326400,
+        "linkedInUri": "linkedin.com/company/tradingview",
+        "facebookUri": "facebook.com/tradingview",
+        "nbOrigins": 1
+      }
+    ],
+    "type": "organization",
+    "title": "Technical Analysis of NVIDIA Corporation (NASDAQ:NVDA) — TradingView"
+  },
+  "qualityScore": {
+    "overall": 8
+  },
+  "timestamp": "2025-08-28T19:21:11.883Z",
+  "status": "success",
+  "extractionMethod": "diffbot",
+  "attempt": 1,
+  "priority": "high",
+  "cachedAt": "2025-08-28T19:22:22.587Z"
+}

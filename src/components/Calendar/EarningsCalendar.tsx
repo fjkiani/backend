@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Loader2, AlertCircle, CalendarDays, Info } from 'lucide-react';
 import { useMarketContext } from '../../hooks/useMarketContext';
-import { config } from '../../config';
+import { BACKEND_CONFIG } from '../../services/backend/config';
 
 // Define an interface matching the FMP API structure (without trendAnalysis)
 interface EarningsEvent {
@@ -107,7 +107,7 @@ export const EarningsCalendar: React.FC = () => {
             setAnalysisError(null);
             const { start, end } = dateRangeDetails;
             // Construct URL without symbol parameter
-            const url = `${config.BACKEND_URL}/api/calendar/earnings?from=${start}&to=${end}`;
+            const url = `${BACKEND_CONFIG.BASE_URL}/api/calendar/earnings?from=${start}&to=${end}`;
 
             try {
                 console.info(`Fetching FMP earnings events from: ${url}`);
@@ -165,7 +165,7 @@ export const EarningsCalendar: React.FC = () => {
         const contextToSend = overallMarketContext || "Overall market context was not available.";
 
         try {
-            const response = await fetch(`${config.BACKEND_URL}/api/calendar/earnings/analyze`, {
+            const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/calendar/earnings/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

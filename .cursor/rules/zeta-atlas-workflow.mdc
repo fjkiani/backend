@@ -1,0 +1,38 @@
+---
+description: "Zeta Atlas workflow: from sitemaps to targeted extraction"
+---
+
+## Zeta Atlas Workflow
+
+Purpose: build a strategic, queryable map of Bloomberg articles before deep extraction.
+
+### Steps
+1) Select sitemap:
+   - Fresh news: `news/latest.xml`
+   - Archive month: `news/YYYY-MM.xml`
+   - Section fronts: `collections/sectionfronts.xml`
+   - Ticker mapping: `securities/index.xml` shards
+
+2) Run Cartographer with filters:
+```bash
+./zeta_agents/13_cartographer_agent.js <SITEMAP_URL> \
+  --include=earnings,fed,cpi \
+  --exclude=politics,opinion \
+  --tickers=nvda,aapl \
+  --since-days=7 \
+  --limit=25
+```
+
+3) Review `zeta_atlas.json` (contains `{ url, lastmod, category }`).
+
+4) Feed selected URLs into Predator/Diffbot or direct-strike + Zeta Brain for article-level synthesis.
+
+### Files
+- Cartographer: [zeta_agents/13_cartographer_agent.js](mdc:zeta_agents/13_cartographer_agent.js)
+- Brain: [zeta_missions/4_intelligence_synthesis.js](mdc:zeta_missions/4_intelligence_synthesis.js)
+
+### Best Practices
+- Always pre-filter aggressively to minimize LLM usage
+- Favor `news/latest.xml` for recency-sensitive missions
+- Use securities sitemap to construct per-ticker target lists
+

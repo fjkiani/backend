@@ -1,0 +1,7 @@
+{
+  "missionObjective": "What are the key URLs on Bloomberg.com for the main market overview, global news, and technology sector analysis?",
+  "timestamp": "2025-08-28T21:42:38.230Z",
+  "targets": [
+    "https://www.bloomberg.com/markets"
+  ]
+}

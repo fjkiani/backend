@@ -17,8 +17,8 @@ const LOOKBACK_WINDOW = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const MAX_AGE_DAYS = 30; // Don't accept articles older than this
 
 // Add these validation functions at the top
-const MINIMUM_CONTENT_LENGTH = 100;
-const MEANINGFUL_TITLE_LENGTH = 15;
+const MINIMUM_CONTENT_LENGTH = 50; // Reduced for Trading Economics
+const MEANINGFUL_TITLE_LENGTH = 5; // Reduced for Trading Economics titles
 
 // Important economic indicators we want to keep
 const importantIndicators = [
@@ -158,7 +158,7 @@ async function analyzeStream(url) {
     try {
       const response = await axios.get('https://api.diffbot.com/v3/analyze', {
         params: {
-          token: process.env.DIFFBOT_TOKEN,
+          token: process.env.DIFFBOT_TOKEN || process.env.VITE_DIFFBOT_TOKEN,
           url: url,
           discussion: false,
           timeout: DIFFBOT_TIMEOUT,
@@ -461,11 +461,37 @@ export async function scrapeNews(forceFresh = false) {
       newCompositeKeys.add(compositeKey);
       
       try {
-        // Validate article before processing
+        // --- Normalize missing fields before validation ---
+        if (!item.title || String(item.title).trim().length === 0) {
+          let normalizedTitle = '';
+          try {
+            normalizedTitle = (item.meta?.title && String(item.meta.title).trim())
+              || (item['og:title'] && String(item['og:title']).trim())
+              || (item.text ? String(item.text).trim().slice(0, 120) : '')
+              || '';
+            if (!normalizedTitle && url) {
+              try {
+                const parts = new URL(url).pathname.split('/').filter(Boolean);
+                if (parts.length) {
+                  normalizedTitle = decodeURIComponent(parts[parts.length - 1]).replace(/[-_]/g, ' ').trim();
+                }
+              } catch {}
+            }
+          } catch {}
+          if (normalizedTitle) {
+            item.title = normalizedTitle;
+          }
+        }
+
+        if (!item.summary) {
+          item.summary = item.content || item.text || '';
+        }
+
+        // Validate after normalization
         logger.info('Validating article:', {
           title: item.title,
           hasTitle: !!item.title,
-          titleLength: item.title?.length,
+          titleLength: item.title ? String(item.title).length : 0,
           summaryLength: (item.summary || item.content || '').length
         });
 

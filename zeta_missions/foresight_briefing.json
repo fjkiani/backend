@@ -1,0 +1,45 @@
+{
+  "key_macroeconomic_events": [
+    {
+      "event_name": "Labor Day Market Closure",
+      "date": "2025-09-01",
+      "potential_impact": "U.S. markets will be closed, resulting in a pause in trading volume and potential volatility upon reopening."
+    },
+    {
+      "event_name": "U.S. Nonfarm Payrolls Report",
+      "date": "2025-09-05",
+      "potential_impact": "This critical employment data release will inform expectations for Federal Reserve policy and could shift market sentiment substantially."
+    },
+    {
+      "event_name": "PCE Price Index Release",
+      "date": "Early September 2025",
+      "potential_impact": "As the Federal Reserve’s preferred inflation measure, the PCE release will directly influence rate policy expectations given inflation above target at 2.6%."
+    },
+    {
+      "event_name": "Federal Reserve Policy Decision",
+      "date": "2025-09-17",
+      "potential_impact": "A highly anticipated decision, with a 75% implied probability of a rate cut; the outcome will drive global risk sentiment and sector rotations."
+    }
+  ],
+  "companies_to_watch": [
+    {
+      "company_name": "Adobe",
+      "ticker": "ADBE",
+      "event": "Earnings Report (Early September)",
+      "key_focus": "Investors will scrutinize subscription growth and new product momentum in Creative Cloud and Experience Cloud for indications of sustainable topline expansion."
+    },
+    {
+      "company_name": "GameStop",
+      "ticker": "GME",
+      "event": "Earnings Report (Early September)",
+      "key_focus": "The market will assess progress on e-commerce initiatives and technology-driven strategy pivots as key indicators of turnaround potential."
+    }
+  ],
+  "dominant_market_narratives": [
+    "Growing anticipation of a near-term Fed rate cut is fueling a marked rotation out of large-cap tech into cyclical and small-cap stocks.",
+    "Above-target inflation and ambiguous economic data releases are amplifying uncertainty around the timing and magnitude of U.S. monetary policy easing.",
+    "Expanding tariffs and supply chain disruptions are adding sector-specific volatility, particularly impacting technology, manufacturing, and consumer goods.",
+    "Global risk factors, including China's property sector instability and European energy challenges, are dampening sentiment toward multinational earnings prospects."
+  ],
+  "strategic_summary": "The upcoming week is defined by pivotal macroeconomic releases and the Federal Reserve’s looming policy decision, both of which are likely to reshape investor positioning across equities. Small-cap and cyclical sectors could outperform if rate cut expectations are confirmed, but persistent inflation, trade frictions, and global headwinds warrant caution. Market participants should remain nimble and closely monitor labor data, inflation indicators, and key corporate earnings for emerging signals."
+}

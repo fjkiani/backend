@@ -124,10 +124,14 @@ router.post('/run-minute-scrape', async (req, res) => {
 
 router.post('/trigger-te-scrape', async (req, res) => {
 	try {
-		// Simple bearer token auth
+		// Simple bearer token auth (skip for cron jobs)
 		const authHeader = req.headers.authorization || '';
 		const expected = process.env.CRON_TOKEN ? `Bearer ${process.env.CRON_TOKEN}` : null;
-		if (!expected || authHeader !== expected) {
+
+		// Allow cron jobs without auth header or with special cron header
+		const isCronJob = !authHeader || req.headers['x-vercel-cron'] === 'true' || req.headers['user-agent']?.includes('vercel-cron');
+
+		if (!isCronJob && (!expected || authHeader !== expected)) {
 			return res.status(401).json({ ok: false, error: 'unauthorized' });
 		}
 

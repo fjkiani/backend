@@ -1,0 +1,364 @@
+{
+  "source": "TradingView Quote",
+  "category": "price",
+  "url": "https://www.tradingview.com/symbols/NASDAQ-NVDA/",
+  "rawData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.tradingview.com/symbols/NASDAQ-NVDA/",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [
+      {
+        "diffbotUri": "list|3|1626466098",
+        "icon": "https://static.tradingview.com/static/images/favicon/apple-touch-icon-180x180.png",
+        "pageUrl": "https://www.tradingview.com/symbols/NASDAQ-NVDA/",
+        "type": "list",
+        "title": "NVIDIA Stock Chart — NASDAQ:NVDA Stock Price — TradingView",
+        "items": [
+          {
+            "summary": "t",
+            "link": "https://www.tradingview.com/chart/?symbol=NASDAQ%3ANVDA",
+            "title": "NVDA chart"
+          },
+          {
+            "date": "Wed, 05 Feb 2025 00:00:00 GMT",
+            "summary": "1 day\n\n−0.09%5 days\n\n5.21%1 month\n\n4.36%6 months\n\n53.87%Year to date\n\n33.53%1 year\n\n45.22%5 years\n\n‪1.33 K‬%\nAll time\n\n‪414.98 K‬%",
+            "link": "https://www.tradingview.com/chart/?symbol=NASDAQ%3ANVDA",
+            "title": "Full chart"
+          },
+          {
+            "title": "NVIDIA reported its financial results for the second quarter of fiscal 2026, providing insights into its performance and key metrics during this period."
+          },
+          {
+            "title": "The U.S. government will buy a 15% stake in Nvidia to secure resources and boost industrial growth, alongside investments in Intel and MP Materials under the CHIPS Act."
+          },
+          {
+            "title": "Nvidia's recent sales forecast disappointed investors, resulting in a decline in its shares during aftermarket trading."
+          },
+          {
+            "summary": "Next report date",
+            "title": "Next report date"
+          },
+          {
+            "summary": "Report period",
+            "title": "Report period"
+          },
+          {
+            "summary": "EPS estimate",
+            "title": "EPS estimate"
+          },
+          {
+            "summary": "Revenue estimate",
+            "title": "Revenue estimate"
+          },
+          {
+            "summary": "s",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-overview/",
+            "title": "Key stats"
+          },
+          {
+            "summary": "‪4.43 T‬ USD",
+            "link": "https://www.tradingview.com/support/solutions/43000597015",
+            "title": "Market capitalization"
+          },
+          {
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-dividends/",
+            "title": "Dividend yield (indicated)"
+          },
+          {
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/price-earnings/",
+            "title": "Price to earnings Ratio (TTM)"
+          },
+          {
+            "date": "Thu, 13 Mar 2025 00:00:00 GMT",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-income-statement/earnings-per-share-basic/",
+            "title": "Basic EPS (TTM)"
+          },
+          {
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-income-statement/net-income/",
+            "title": "Net income (FY)"
+          },
+          {
+            "summary": "‪130.50 B‬",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-revenue/",
+            "title": "Revenue (FY)"
+          },
+          {
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/float-shares-outstanding/",
+            "title": "Shares float"
+          },
+          {
+            "date": "Wed, 28 Aug 2024 00:00:00 GMT",
+            "link": "https://www.tradingview.com/support/solutions/43000703603",
+            "title": "Beta (1Y)"
+          },
+          {
+            "date": "Wed, 28 Aug 2024 00:00:00 GMT",
+            "summary": "Employees (FY)\n\n\n‪36 K‬\nChange (1Y)\n\n\n\n‪+6.4 K‬ +21.62%Revenue / Employee (1Y)\n\n\n‪3.62 M‬ USD\nNet income / Employee (1Y)\n\n\n‪2.02 M‬ USD",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/number-of-employees/",
+            "title": "Employees"
+          },
+          {
+            "link": "https://www.tradingview.com/markets/stocks-usa/sectorandindustry-sector/electronic-technology/",
+            "title": "Electronic Technology"
+          },
+          {
+            "link": "https://www.tradingview.com/markets/stocks-usa/sectorandindustry-industry/semiconductors/",
+            "title": "Industry"
+          },
+          {
+            "summary": "CEO",
+            "title": "CEO"
+          },
+          {
+            "summary": "Website\n\nnvidia.com",
+            "link": "http://www.nvidia.com/",
+            "title": "Website"
+          },
+          {
+            "summary": "Headquarters",
+            "title": "Headquarters"
+          },
+          {
+            "summary": "Founded",
+            "title": "Founded"
+          },
+          {
+            "summary": "FIGI\n\n\nBBG000BBJQV0",
+            "title": "FIGI"
+          },
+          {
+            "summary": "NVIDIA Corp engages in the design and manufacture of computer graphics processors, chipsets, and related multimedia software. It operates through the following segments: Graphics Processing Unit (GPU), Tegra Processor, and All Other. The GPU segment comprises of product brands, which aims specialized markets including GeForce for gamers; Quadro for designers; Tesla and DGX for AI data scientists and big data researchers; and GRID for cloud-based visual computing users. The Tegra Processor segment integrates an entire computer onto a single chip, and incorporates GPUs and multi-core CPUs to drive supercomputing for autonomous robots, drones, and cars, as well as for consoles and mobile gaming and entertainment devices. The All Other segment refers to the stock-based compensation expense, corporate infrastructure and support costs, acquisition-related costs, legal settlement costs, and other non-recurring charges. The company was founded by Jen Hsun Huang, Chris A. Malachowsky, and Curtis R. Priem in January 1993 and is headquartered in Santa Clara, CA.",
+            "title": "Show more"
+          },
+          {
+            "summary": "Related stocks\n\nCheck out other big names from the same industry as NVDA.",
+            "title": "Related stocks"
+          },
+          {
+            "summary": "s",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-overview/",
+            "title": "Financials"
+          },
+          {
+            "summary": "Performance\n\n\n\n\nAnnual\nQuarterly",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/?solution=43000699485",
+            "title": "Quarterly"
+          },
+          {
+            "summary": "Revenue to profit conversion\n\n\n\n\nAnnual\nQuarterly",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/?solution=43000713861",
+            "title": "Quarterly"
+          },
+          {
+            "summary": "Debt level and coverage\n\n\n\n\nAnnual\nQuarterly",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/?solution=43000699502",
+            "title": "Quarterly"
+          },
+          {
+            "summary": "Earnings\n\nNext:\n—\n\n\n\nAnnual\nQuarterly",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/?solution=43000699498",
+            "title": "Earnings"
+          },
+          {
+            "summary": "Loupaccc\nFXDave_\nSanny92charm1176\nPotatoJuice99\nluther84695\nRedneckTrades\nDarkmatter513JCRZRZ_\ntacobb23\nFiboTrader1\n\nSee all minds",
+            "image": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220,0,20,20%22%20width=%2296%22%20height=%2296%22%3E%3Crect%20height=%2220%22%20width=%2220%22%20fill=%22hsl%28270,25%25,50%25%29%22/%3E%3Ctext%20fill=%22white%22%20x=%2210%22%20y=%2214.8%22%20font-size=%2214%22%20font-family=%22-apple-system,BlinkMacSystemFont,Trebuchet%20MS,Roboto,Ubuntu,sans-serif%22%20text-anchor=%22middle%22%3EL%3C/text%3E%3C/svg%3E",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/minds/",
+            "title": "Community forum"
+          }
+        ]
+      }
+    ],
+    "type": "list",
+    "title": "NVIDIA Stock Chart — NASDAQ:NVDA Stock Price — TradingView"
+  },
+  "processedData": {
+    "request": {
+      "options": [
+        "render=true"
+      ],
+      "pageUrl": "https://www.tradingview.com/symbols/NASDAQ-NVDA/",
+      "api": "analyze",
+      "version": 3
+    },
+    "humanLanguage": "en",
+    "objects": [
+      {
+        "diffbotUri": "list|3|1626466098",
+        "icon": "https://static.tradingview.com/static/images/favicon/apple-touch-icon-180x180.png",
+        "pageUrl": "https://www.tradingview.com/symbols/NASDAQ-NVDA/",
+        "type": "list",
+        "title": "NVIDIA Stock Chart — NASDAQ:NVDA Stock Price — TradingView",
+        "items": [
+          {
+            "summary": "t",
+            "link": "https://www.tradingview.com/chart/?symbol=NASDAQ%3ANVDA",
+            "title": "NVDA chart"
+          },
+          {
+            "date": "Wed, 05 Feb 2025 00:00:00 GMT",
+            "summary": "1 day\n\n−0.09%5 days\n\n5.21%1 month\n\n4.36%6 months\n\n53.87%Year to date\n\n33.53%1 year\n\n45.22%5 years\n\n‪1.33 K‬%\nAll time\n\n‪414.98 K‬%",
+            "link": "https://www.tradingview.com/chart/?symbol=NASDAQ%3ANVDA",
+            "title": "Full chart"
+          },
+          {
+            "title": "NVIDIA reported its financial results for the second quarter of fiscal 2026, providing insights into its performance and key metrics during this period."
+          },
+          {
+            "title": "The U.S. government will buy a 15% stake in Nvidia to secure resources and boost industrial growth, alongside investments in Intel and MP Materials under the CHIPS Act."
+          },
+          {
+            "title": "Nvidia's recent sales forecast disappointed investors, resulting in a decline in its shares during aftermarket trading."
+          },
+          {
+            "summary": "Next report date",
+            "title": "Next report date"
+          },
+          {
+            "summary": "Report period",
+            "title": "Report period"
+          },
+          {
+            "summary": "EPS estimate",
+            "title": "EPS estimate"
+          },
+          {
+            "summary": "Revenue estimate",
+            "title": "Revenue estimate"
+          },
+          {
+            "summary": "s",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-overview/",
+            "title": "Key stats"
+          },
+          {
+            "summary": "‪4.43 T‬ USD",
+            "link": "https://www.tradingview.com/support/solutions/43000597015",
+            "title": "Market capitalization"
+          },
+          {
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-dividends/",
+            "title": "Dividend yield (indicated)"
+          },
+          {
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/price-earnings/",
+            "title": "Price to earnings Ratio (TTM)"
+          },
+          {
+            "date": "Thu, 13 Mar 2025 00:00:00 GMT",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-income-statement/earnings-per-share-basic/",
+            "title": "Basic EPS (TTM)"
+          },
+          {
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-income-statement/net-income/",
+            "title": "Net income (FY)"
+          },
+          {
+            "summary": "‪130.50 B‬",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-revenue/",
+            "title": "Revenue (FY)"
+          },
+          {
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/float-shares-outstanding/",
+            "title": "Shares float"
+          },
+          {
+            "date": "Wed, 28 Aug 2024 00:00:00 GMT",
+            "link": "https://www.tradingview.com/support/solutions/43000703603",
+            "title": "Beta (1Y)"
+          },
+          {
+            "date": "Wed, 28 Aug 2024 00:00:00 GMT",
+            "summary": "Employees (FY)\n\n\n‪36 K‬\nChange (1Y)\n\n\n\n‪+6.4 K‬ +21.62%Revenue / Employee (1Y)\n\n\n‪3.62 M‬ USD\nNet income / Employee (1Y)\n\n\n‪2.02 M‬ USD",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-statistics-and-ratios/number-of-employees/",
+            "title": "Employees"
+          },
+          {
+            "link": "https://www.tradingview.com/markets/stocks-usa/sectorandindustry-sector/electronic-technology/",
+            "title": "Electronic Technology"
+          },
+          {
+            "link": "https://www.tradingview.com/markets/stocks-usa/sectorandindustry-industry/semiconductors/",
+            "title": "Industry"
+          },
+          {
+            "summary": "CEO",
+            "title": "CEO"
+          },
+          {
+            "summary": "Website\n\nnvidia.com",
+            "link": "http://www.nvidia.com/",
+            "title": "Website"
+          },
+          {
+            "summary": "Headquarters",
+            "title": "Headquarters"
+          },
+          {
+            "summary": "Founded",
+            "title": "Founded"
+          },
+          {
+            "summary": "FIGI\n\n\nBBG000BBJQV0",
+            "title": "FIGI"
+          },
+          {
+            "summary": "NVIDIA Corp engages in the design and manufacture of computer graphics processors, chipsets, and related multimedia software. It operates through the following segments: Graphics Processing Unit (GPU), Tegra Processor, and All Other. The GPU segment comprises of product brands, which aims specialized markets including GeForce for gamers; Quadro for designers; Tesla and DGX for AI data scientists and big data researchers; and GRID for cloud-based visual computing users. The Tegra Processor segment integrates an entire computer onto a single chip, and incorporates GPUs and multi-core CPUs to drive supercomputing for autonomous robots, drones, and cars, as well as for consoles and mobile gaming and entertainment devices. The All Other segment refers to the stock-based compensation expense, corporate infrastructure and support costs, acquisition-related costs, legal settlement costs, and other non-recurring charges. The company was founded by Jen Hsun Huang, Chris A. Malachowsky, and Curtis R. Priem in January 1993 and is headquartered in Santa Clara, CA.",
+            "title": "Show more"
+          },
+          {
+            "summary": "Related stocks\n\nCheck out other big names from the same industry as NVDA.",
+            "title": "Related stocks"
+          },
+          {
+            "summary": "s",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/financials-overview/",
+            "title": "Financials"
+          },
+          {
+            "summary": "Performance\n\n\n\n\nAnnual\nQuarterly",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/?solution=43000699485",
+            "title": "Quarterly"
+          },
+          {
+            "summary": "Revenue to profit conversion\n\n\n\n\nAnnual\nQuarterly",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/?solution=43000713861",
+            "title": "Quarterly"
+          },
+          {
+            "summary": "Debt level and coverage\n\n\n\n\nAnnual\nQuarterly",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/?solution=43000699502",
+            "title": "Quarterly"
+          },
+          {
+            "summary": "Earnings\n\nNext:\n—\n\n\n\nAnnual\nQuarterly",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/?solution=43000699498",
+            "title": "Earnings"
+          },
+          {
+            "summary": "Loupaccc\nFXDave_\nSanny92charm1176\nPotatoJuice99\nluther84695\nRedneckTrades\nDarkmatter513JCRZRZ_\ntacobb23\nFiboTrader1\n\nSee all minds",
+            "image": "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220,0,20,20%22%20width=%2296%22%20height=%2296%22%3E%3Crect%20height=%2220%22%20width=%2220%22%20fill=%22hsl%28270,25%25,50%25%29%22/%3E%3Ctext%20fill=%22white%22%20x=%2210%22%20y=%2214.8%22%20font-size=%2214%22%20font-family=%22-apple-system,BlinkMacSystemFont,Trebuchet%20MS,Roboto,Ubuntu,sans-serif%22%20text-anchor=%22middle%22%3EL%3C/text%3E%3C/svg%3E",
+            "link": "https://www.tradingview.com/symbols/NASDAQ-NVDA/minds/",
+            "title": "Community forum"
+          }
+        ]
+      }
+    ],
+    "type": "list",
+    "title": "NVIDIA Stock Chart — NASDAQ:NVDA Stock Price — TradingView"
+  },
+  "qualityScore": {
+    "overall": 8
+  },
+  "timestamp": "2025-08-28T19:21:07.759Z",
+  "status": "success",
+  "extractionMethod": "diffbot",
+  "attempt": 1,
+  "priority": "high",
+  "cachedAt": "2025-08-28T19:22:22.586Z"
+}

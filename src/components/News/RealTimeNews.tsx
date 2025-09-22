@@ -4,7 +4,7 @@ import { ProcessedArticle } from '../../services/news/types'; // Keep for NewsCa
 // Import the shared InternalArticle type
 import { InternalArticle } from '../../types/news.types';
 import { Loader2, RefreshCw } from 'lucide-react';
-import { config } from '../../config';
+import { BACKEND_CONFIG } from '../../services/backend/config';
 
 // Remove the outdated manual interface
 /*
@@ -47,7 +47,7 @@ export const RealTimeNews = () => {
     
     try {
       console.log('Requesting market overview for', fetchedArticles.length, 'articles');
-      const response = await fetch(`${config.BACKEND_URL}/api/analysis/market-overview`, {
+      const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/analysis/market-overview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -88,7 +88,7 @@ export const RealTimeNews = () => {
     
     try {
       setIsRefreshing(forceRefresh);
-      const response = await fetch(`${config.BACKEND_URL}/api/real-time-news/news${forceRefresh ? '?refresh=true' : ''}`);
+      const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/real-time-news/news${forceRefresh ? '?refresh=true' : ''}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

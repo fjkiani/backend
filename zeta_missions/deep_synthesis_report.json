@@ -1,0 +1,91 @@
+{
+  "marketSummary": {
+    "overallMarketSentiment": "Bullish, with major equity indices rising on strong economic signals.",
+    "majorIndices": {
+      "S&P 500": {
+        "value": 6501.86,
+        "change_percent": 0.32
+      },
+      "Nasdaq": {
+        "value": 21705.16,
+        "change_percent": 0.53
+      },
+      "Dow Jones": {
+        "value": 45636.9,
+        "change_percent": 0.16
+      },
+      "FTSE 100": {
+        "value": 9216.82,
+        "change_percent": -0.42
+      },
+      "Russell 2000": {
+        "value": 2378.41,
+        "change_percent": 0.19
+      },
+      "Nikkei 225": {
+        "value": 42828.79,
+        "change_percent": 0.73
+      },
+      "Hang Seng": {
+        "value": 24998.82,
+        "change_percent": -0.81
+      },
+      "DAX": {
+        "value": 24039.92,
+        "change_percent": -0.03
+      },
+      "Bloomberg 500": {
+        "value": 2354.88,
+        "change_percent": 0.36
+      },
+      "US 10 Yr": {
+        "yield": 4.2,
+        "change_percent": 0.25
+      },
+      "Crude Oil": {
+        "value": 64.6,
+        "change_percent": 0.7
+      },
+      "Gold": {
+        "value": 3474.3,
+        "change_percent": 0.75
+      },
+      "Euro": {
+        "value": 1.1679,
+        "change_percent": -0.03
+      },
+      "Pound/Dollar": {
+        "value": 1.3512,
+        "change_percent": -0.01
+      }
+    }
+  },
+  "keyEvents": [
+    {
+      "headline": "US Economy Expands at Revised 3.3% Rate on Stronger Investment",
+      "summary": "The U.S. economy grew at an annualized rate of 3.3% in the second quarter of 2025, surpassing initial estimates and marking a notable rebound from the 0.5% contraction in the first quarter. This upward revision was driven by a significant pickup in business investment, especially in structures, equipment, and intellectual property, as well as a substantial boost from declining imports, which together more than offset prior weaknesses and underlined the resilience of consumer spending. The revision, based on updated data from the Bureau of Economic Analysis, also reflects continued concerns about underlying demand and highlights the impact of tariff-related trade shifts and the ongoing influence of investment in technologies like AI.",
+      "marketImpact": "Strong GDP growth and higher investment provide direct support to the bullish market sentiment and sustained rally in major indices. The optimistic data bolsters investor confidence, especially in sectors tied to technology and business investment. However, lingering concerns around demand and trade frictions could limit upside if conditions deteriorate."
+    },
+    {
+      "headline": "Bond Market Bonanza Leaves Investors With Razor-Thin Safety Net",
+      "summary": "The article explains that investors in the global bond market are accepting the lowest compensation in years for taking on credit risk, driven by a mix of economic optimism, fear of missing out (FOMO), and an abundance of cash chasing limited securities. As credit spreads tighten to levels not seen since before 2007, yields on even the riskiest bonds drop and in some cases fall below those of US Treasuries. While some solid corporate fundamentals and strong investor demand for higher yields have fueled the rally, the market's compressed risk premiums leave investors increasingly vulnerable to any downturn, with only a razor-thin safety margin if economic conditions deteriorate.",
+      "marketImpact": "While credit spreads suggest robust investor appetite for risk, the razor-thin safety net increases vulnerability if macro conditions reverse. A sudden adverse event could lead to sharp repricing in credit markets and spill over to equities, warranting close risk monitoring by investors."
+    },
+    {
+      "headline": "Oil Rises as Waning Ukraine Peace Hopes Endanger Russian Supply",
+      "summary": "Oil prices increased as prospects for a peace agreement between Russia and Ukraine diminished, reducing the likelihood that Russian crude supplies will return to global markets soon. The rise in crude was driven by German Chancellor Friedrich Merz’s comments that a meeting between the Russian and Ukrainian presidents is not forthcoming—dimming hopes for eased export restrictions. Meanwhile, ongoing attacks on Russian oil infrastructure and heightened U.S. pressure on India to reduce Russian oil imports underscore the market’s geopolitical uncertainty, though analysts still see a bearish outlook as supply is expected to outpace demand by year-end.",
+      "marketImpact": "Temporary spikes in oil prices introduce inflationary risk and support gains in energy stocks. However, the longer-term supply/demand dynamic remains bearish, suggesting limited duration for elevated prices unless geopolitical tensions further escalate."
+    },
+    {
+      "headline": "Petco Jumps After Hiking Profit View as Turnaround Gains Steam",
+      "summary": "Petco Health & Wellness Co Inc. shares surged up to 31% after the company raised its full-year profit outlook, citing clear signs of progress in its turnaround effort. For the second quarter of 2025, Petco reported a 36% year-over-year jump in adjusted EBITDA to $113.9 million and improved operating income, even as net sales declined 2.3% to $1.5 billion, with management highlighting strengthened margins and ongoing investments in cost discipline and operational efficiency. The company’s ongoing transformation includes strategic store closures, supply chain optimization, and investments in high-growth areas such as animal health and grooming, positioning Petco to benefit from industry tailwinds despite near-term revenue headwinds.",
+      "marketImpact": "Petco's successful turnaround adds evidence of select retail sector strength, especially where operational improvements and strategic capital allocation drive profit growth. This may increase investor interest in turnaround plays and high-margin consumer businesses."
+    }
+  ],
+  "emergingNarratives": "Despite persistent warnings about elevated valuations and tightening bond market risk premiums, equity markets continue to shrug off pessimism amid strong technological investment, resilient consumer behavior, and impressive corporate earnings. The divergence between surging stock prices and cautious credit market conditions highlights the importance of selective risk management. Geopolitical tensions, especially in Eastern Europe, underpin volatility in commodity markets, while company-specific turnarounds demonstrate opportunities for outsized returns—even within sectors facing structural challenges.",
+  "actionableIntel": [
+    "Consider maintaining exposure to technology and AI-focused equities, which continue to benefit from both robust investment and positive earnings momentum.",
+    "Monitor credit markets closely—for signs of repricing risk—since historically tight spreads elevate vulnerability to adverse macro surprises.",
+    "Evaluate commodity-linked plays opportunistically (such as energy stocks), but avoid long-duration bets in oil unless geopolitical risks worsen, given the bearish longer-term outlook on supply/demand."
+  ]
+}
