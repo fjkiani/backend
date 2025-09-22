@@ -204,7 +204,11 @@ export const EarningsCalendar: React.FC = () => {
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
             setAnalysisError(errorMessage);
-            setCurrentAnalysis({ symbol: event.symbol, text: `Error: ${errorMessage}` }); // Show error in display
+            // Show a more helpful message for missing estimates
+            const displayMessage = typeof event.epsEstimated !== 'number' 
+                ? `Analysis unavailable for ${event.symbol}: No earnings estimate available for analysis.`
+                : `Error: ${errorMessage}`;
+            setCurrentAnalysis({ symbol: event.symbol, text: displayMessage }); // Show error in display
             console.error(`[Analyze] Fetch error for ${event.symbol}:`, err);
         } finally {
             setAnalysisLoading(false);
@@ -221,20 +225,18 @@ export const EarningsCalendar: React.FC = () => {
                 <td className="px-2 py-2 whitespace-nowrap font-semibold text-blue-700">
                     <div className="flex items-center gap-1">
                         <span>{event.symbol}</span>
-                        {/* Show Info icon only if there is an estimate to analyze */}
-                        {typeof event.epsEstimated === 'number' && (
-                            <button 
-                                onClick={() => handleAnalyzeClick(event)}
-                                disabled={analysisLoading && currentAnalysis?.symbol === event.symbol} // Disable only if loading for this specific one
-                                className="p-0.5 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed" 
-                                title="Analyze Trend"
-                            >
-                                {isAnalysisLoadingForThis ? 
-                                    <Loader2 size={14} className="animate-spin text-blue-600" /> : 
-                                    <Info size={14} className="text-blue-600" />
-                                }
-                            </button>
-                        )}
+                        {/* Show Info icon for analysis - now available for all earnings */}
+                        <button 
+                            onClick={() => handleAnalyzeClick(event)}
+                            disabled={analysisLoading && currentAnalysis?.symbol === event.symbol} // Disable only if loading for this specific one
+                            className="p-0.5 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed" 
+                            title="Analyze Trend"
+                        >
+                            {isAnalysisLoadingForThis ? 
+                                <Loader2 size={14} className="animate-spin text-blue-600" /> : 
+                                <Info size={14} className="text-blue-600" />
+                            }
+                        </button>
                     </div>
                 </td>
                 <td className="px-2 py-2 whitespace-nowrap text-right text-gray-700">{formatEPS(event.epsEstimated)}</td>
