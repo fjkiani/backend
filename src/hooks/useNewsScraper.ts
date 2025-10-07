@@ -30,9 +30,12 @@ export function useNewsScraper(refreshInterval = 300000) {
     isFetchingRef.current = true;
     try {
       setLoading(true);
-      const endpoint = useFresh ? '/api/news?fresh=true' : '/api/news';
+      const endpoint = '/api/news'; // Always use the same endpoint as RealTimeNews
       const url = new URL(`${BACKEND_CONFIG.BASE_URL}${endpoint}`);
       url.searchParams.set('t', Date.now().toString()); // cache bust
+      if (useFresh) {
+        url.searchParams.set('refresh', 'true'); // Force refresh from backend
+      }
       console.debug('[useNewsScraper] GET', url.toString());
       const response = await fetch(url.toString(), { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -42,9 +45,9 @@ export function useNewsScraper(refreshInterval = 300000) {
 
       // Debug: log first three
       const preview = sorted.slice(0, 3).map((a) => ({
-        title: a.title,
-        created_at: a.created_at || a.published_at || a.publishedAt,
-        url: a.url
+        title: a.raw?.title || a.title || 'No title',
+        created_at: a.created_at || a.published_at || a.publishedAt || a.raw?.publishedAt,
+        url: a.raw?.url || a.url || '#'
       }));
       console.debug('[useNewsScraper] Received articles:', { count: sorted.length, first3: preview });
 
@@ -128,7 +131,7 @@ export function useNewsScraper(refreshInterval = 300000) {
       window.clearInterval(timeoutId);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [refreshInterval, fetchNews, sortArticles, subscriptionStatus]);
+  }, [refreshInterval, sortArticles, subscriptionStatus]); // Remove fetchNews to prevent infinite loop
 
   const refreshNews = useCallback(async () => {
     await triggerScraper();
