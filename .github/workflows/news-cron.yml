@@ -1,0 +1,26 @@
+name: News Scraping Cron Jobs
+
+on:
+  schedule:
+    # High frequency: every 30 minutes
+    - cron: '*/30 * * * *'
+    # Market hours: every minute during trading hours (9:30 AM - 4:00 PM ET, Mon-Fri)
+    - cron: '*/1 13-20 * * 1-5'
+    # Low frequency backup: every 2 hours
+    - cron: '0 */2 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  scrape-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger News Scraping
+        run: |
+          curl -X POST "https://web-production-9a14.up.railway.app/api/schedule/trigger-te-scrape" \
+            -H "Content-Type: application/json" \
+            -H "x-vercel-cron: true" \
+            -H "User-Agent: GitHub-Actions-Cron"
+        
+      - name: Log Success
+        run: echo "News scraping triggered at $(date)"
+

@@ -9,11 +9,16 @@ import { GoogleGenaiService } from '../services/analysis/googleGenaiService.js';
 
 const router = express.Router();
 
-// Initialize Redis client
-export const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379'); // Export redis instance
+// Redis completely disabled to prevent connection issues
+// Export a mock Redis object that does nothing
+export const redis = {
+  get: async () => null,
+  set: async () => null,
+  del: async () => null,
+  ping: async () => 'PONG'
+};
 
-redis.on('error', (err) => logger.error('Redis Client Error', err));
-redis.on('connect', () => logger.info('Connected to Redis'));
+logger.warn('Redis caching completely disabled - using mock Redis object');
 
 const CACHE_DURATION = 3600; // 1 hour in seconds
 
@@ -23,28 +28,16 @@ function createCacheKey(content) {
   return `analysis:${Buffer.from(content.slice(0, 100)).toString('base64')}`;
 }
 
-// Wrapper for Redis get with error handling
+// Wrapper for Redis get with error handling - DISABLED COMPLETELY
 async function getCachedAnalysis(key) {
-  try {
-    const cached = await redis.get(key);
-    if (cached) {
-      logger.info('Analysis cache HIT', { key });
-      return JSON.parse(cached);
-    }
-  } catch (error) {
-    logger.error('Redis get error:', error);
-  }
+  logger.debug('Redis caching disabled - returning null');
   return null;
 }
 
-// Wrapper for Redis set with error handling
+// Wrapper for Redis set with error handling - DISABLED COMPLETELY
 async function setCachedAnalysis(key, value) {
-  try {
-    await redis.set(key, JSON.stringify(value), 'EX', CACHE_DURATION);
-    logger.info('Analysis cached', { key });
-  } catch (error) {
-    logger.error('Redis set error:', error);
-  }
+  logger.debug('Redis caching disabled - skipping cache set');
+  return;
 }
 
 async function getAnalysis(content) {

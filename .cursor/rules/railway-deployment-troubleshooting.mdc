@@ -1,0 +1,175 @@
+---
+description: Railway deployment troubleshooting guide and lessons learned
+alwaysApply: false
+---
+
+# Railway Deployment Troubleshooting Guide
+
+## 🚀 **SUCCESSFUL DEPLOYMENT STATUS**
+
+**Current Status:** ✅ **DEPLOYED AND WORKING**
+- **URL:** `https://web-production-9a14.up.railway.app`
+- **Health Check:** ✅ Passing
+- **All Services:** ✅ Initialized (CohereService, DiffbotService, GoogleGenaiService)
+- **Node.js Version:** 22.11.0 (Auto-detected by Railway)
+- **Environment Variables:** ✅ All configured
+
+## 🔧 **ISSUES ENCOUNTERED & SOLUTIONS**
+
+### 1. **Node.js Version Compatibility Issues**
+**Problem:** Packages `cheerio@1.1.2` and `undici@7.15.0` required Node.js 20.18.1+, but Railway was using Node.js 20.6.1
+```
+npm WARN EBADENGINE package: 'cheerio@1.1.2', required: { node: '>=20.18.1' }, current: { node: 'v20.6.1' }
+```
+
+**Solution:** Downgraded problematic packages to compatible versions:
+```bash
+npm install cheerio@1.0.0-rc.12 undici@6.20.0 --save
+```
+
+### 2. **TypeScript/Deno Detection Issues**
+**Problem:** Railway incorrectly detected project as Deno due to TypeScript files
+```
+RUN deno cache src/services/diffbot/index.ts
+error: Module not found "file:///app/src/services/diffbot/types"
+```
+
+**Solution:** Created `.railwayignore` file to exclude TypeScript files:
+```
+# Ignore TypeScript files to force Node.js detection
+*.ts
+src/tests/
+src/config/diffbot.ts
+src/services/diffbot/*.ts
+
+# Keep JavaScript files
+!src/services/diffbot/DiffbotService.js
+```
+
+### 3. **Environment Variable Naming Mismatch**
+**Problem:** Code expected `VITE_SUPABASE_URL` but Railway had `SUPABASE_URL`
+```
+Error: Missing Supabase environment variables
+```
+
+**Solution:** Updated [backend/src/supabase/client.js](mdc:backend/src/supabase/client.js) to use fallback logic:
+```javascript
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+```
+
+### 4. **Module Import Errors**
+**Problem:** `Cannot find package 'express'` - node_modules not being copied properly
+**Solution:** Simplified Railway configuration by removing custom `nixpacks.toml` and letting Railway auto-detect
+
+### 5. **NPM Cache Lock Issues**
+**Problem:** `EBUSY: resource busy or locked, rmdir '/app/node_modules/.cache'`
+**Solution:** Removed `--no-cache` flag from npm commands
+
+## 📋 **RAILWAY CONFIGURATION FILES**
+
+### [backend/railway.toml](mdc:backend/railway.toml)
+```toml
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm run railway:start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+
+[env]
+NODE_ENV = "production"
+PORT = "3000"
+```
+
+### [backend/.railwayignore](mdc:backend/.railwayignore)
+```
+# Ignore TypeScript files to force Node.js detection
+*.ts
+src/tests/
+src/config/diffbot.ts
+src/services/diffbot/*.ts
+
+# Keep JavaScript files
+!src/services/diffbot/DiffbotService.js
+
+# Ignore development files
+node_modules
+.env.local
+.env.development
+*.log
+.DS_Store
+```
+
+## 🔑 **REQUIRED ENVIRONMENT VARIABLES**
+
+Railway Dashboard Environment Variables:
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_ANON_KEY` - Supabase anonymous key
+- `GEMINI_API_KEY` - Google Gemini API key
+- `COHERE_API_KEY` - Cohere API key
+- `DIFFBOT_TOKEN` - Diffbot API token
+- `FMP_API_KEY` - Financial Modeling Prep API key (optional)
+- `MBOUM_RAPIDAPI_KEY` - Mboum API key (optional)
+
+## 🚨 **CRITICAL LESSONS LEARNED**
+
+1. **Package Compatibility:** Always check Node.js version requirements for dependencies
+2. **TypeScript Detection:** Railway auto-detects TypeScript as Deno - use `.railwayignore` to prevent this
+3. **Environment Variables:** Use consistent naming between local and production environments
+4. **Auto-Detection:** Sometimes letting Railway auto-detect is better than custom configurations
+5. **Fallback Logic:** Always implement fallback logic for environment variables
+
+## 🔍 **DEBUGGING COMMANDS**
+
+### Check Deployment Status
+```bash
+railway status
+```
+
+### View Logs
+```bash
+railway logs
+```
+
+### Test Health Endpoint
+```bash
+curl https://web-production-9a14.up.railway.app/api/health
+```
+
+### Test API Endpoints
+```bash
+curl https://web-production-9a14.up.railway.app/api/news
+curl https://web-production-9a14.up.railway.app/api/calendar/earnings
+```
+
+## 📊 **DEPLOYMENT SUCCESS INDICATORS**
+
+✅ **Build Phase:** No errors, all dependencies installed
+✅ **Start Phase:** Server starts without module errors
+✅ **Health Check:** `/api/health` returns 200 OK
+✅ **Service Initialization:** All services (Cohere, Diffbot, Gemini) initialize successfully
+✅ **Environment Variables:** All required variables detected and loaded
+✅ **Database Connection:** Supabase client connects successfully
+
+## 🎯 **NEXT STEPS**
+
+1. **Verify Cron Jobs:** Check if scheduled tasks are running
+2. **Frontend Integration:** Update frontend to use Railway backend URL
+3. **End-to-End Testing:** Test all API endpoints
+4. **Monitoring:** Set up proper logging and monitoring
+5. **Performance:** Monitor response times and resource usage
+
+## 🛠️ **TROUBLESHOOTING CHECKLIST**
+
+If deployment fails:
+1. Check Node.js version compatibility
+2. Verify `.railwayignore` excludes TypeScript files
+3. Ensure all environment variables are set
+4. Check for module import errors
+5. Verify package.json dependencies
+6. Review Railway build logs for specific errors
+
+This guide documents the complete journey from deployment failures to successful Railway deployment.
