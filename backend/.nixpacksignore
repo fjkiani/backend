@@ -1,0 +1,18 @@
+# Ignore TypeScript files from Deno detection
+*.ts
+*.tsx
+
+# Ignore test files
+tests/
+test-*.js
+test-*.ts
+
+# Ignore Python files
+*.py
+
+# Ignore development files
+*.md
+.git/
+.github/
+node_modules/
+
