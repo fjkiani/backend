@@ -1,7 +1,7 @@
 import { ProcessedArticle } from '../news/types';
 import { createClient } from '@supabase/supabase-js';
 
-const COHERE_API_KEY = 'OPnR3L2JKy7VXt9MKeCM5KKhQxSZge4snUt6xwL0';
+const COHERE_API_KEY = 'AGAOo9luSIR92zZUYdnObZy6ap4lBs1bQb8fjy3u';
 const COHERE_API_URL = 'https://api.cohere.ai/v1/generate';
 
 // Cache management with localStorage

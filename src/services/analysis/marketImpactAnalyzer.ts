@@ -1,11 +1,12 @@
 import axios, { AxiosError } from 'axios';
+import { BACKEND_CONFIG } from '../backend/config';
 
 export async function analyzeMarketImpact(content: string) {
   try {
-    console.log('Attempting to connect to:', `${import.meta.env.VITE_SCRAPER_API_URL}/api/analysis/market-impact`);
+    console.log('Attempting to connect to:', `${BACKEND_CONFIG.BASE_URL}/api/analysis/market-impact`);
     
     const response = await axios.post(
-      `${import.meta.env.VITE_SCRAPER_API_URL}/api/analysis/market-impact`,
+      `${BACKEND_CONFIG.BASE_URL}/api/analysis/market-impact`,
       { content },
       { 
         headers: { 'Content-Type': 'application/json' },
