@@ -464,4 +464,48 @@ router.post('/trading-economics-overview', async (req, res) => {
   }
 });
 
+// News Analysis Endpoint
+router.post('/news-analysis', async (req, res) => {
+  try {
+    const { articleId, articleContent, articleTitle } = req.body;
+    
+    if (!articleId && !articleContent) {
+      return res.status(400).json({ 
+        error: 'Either articleId or articleContent is required' 
+      });
+    }
+
+    logger.info(`[News Analysis] Processing request for articleId: ${articleId}`);
+
+    // Use Gemini for news analysis
+    const googleGenaiService = new GoogleGenaiService();
+    
+    let content = articleContent;
+    if (!content && articleId) {
+      // If only articleId provided, try to fetch content from database
+      // This would require database integration
+      content = `Article ID: ${articleId}`;
+    }
+
+    const analysisResult = await googleGenaiService.analyzeNewsArticle({
+      title: articleTitle || 'News Article',
+      content: content,
+      url: `https://example.com/article/${articleId}`
+    });
+
+    res.json({
+      success: true,
+      analysis: analysisResult,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('[News Analysis] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to analyze news article',
+      details: error.message 
+    });
+  }
+});
+
 export default router;
