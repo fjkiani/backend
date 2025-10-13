@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Loader2, AlertCircle, CalendarDays, Info } from 'lucide-react';
 import { useMarketContext } from '../../hooks/useMarketContext';
-
-// Point to the local backend server during development
-const BACKEND_URL = 'http://localhost:3001';
+import { BACKEND_CONFIG } from '../../services/backend/config';
 
 // Define an interface matching the FMP API structure (without trendAnalysis)
 interface EarningsEvent {
@@ -109,7 +107,7 @@ export const EarningsCalendar: React.FC = () => {
             setAnalysisError(null);
             const { start, end } = dateRangeDetails;
             // Construct URL without symbol parameter
-            const url = `${BACKEND_URL}/api/calendar/earnings?from=${start}&to=${end}`;
+            const url = `${BACKEND_CONFIG.BASE_URL}/api/calendar/earnings?from=${start}&to=${end}`;
 
             try {
                 console.info(`Fetching FMP earnings events from: ${url}`);
@@ -117,6 +115,9 @@ export const EarningsCalendar: React.FC = () => {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
+                    if (response.status === 504 || response.status === 503) {
+                        throw new Error(`Earnings service temporarily unavailable. The API is experiencing high load. Please try again in a moment.`);
+                    }
                     throw new Error(`HTTP error! status: ${response.status} - ${errorData.error || response.statusText}`);
                 }
 
@@ -164,7 +165,7 @@ export const EarningsCalendar: React.FC = () => {
         const contextToSend = overallMarketContext || "Overall market context was not available.";
 
         try {
-            const response = await fetch(`${BACKEND_URL}/api/calendar/earnings/analyze`, {
+            const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/calendar/earnings/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -181,6 +182,9 @@ export const EarningsCalendar: React.FC = () => {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
                 console.error(`[Analyze] Error Response Data for ${event.symbol}:`, errorData);
+                if (response.status === 504 || response.status === 503) {
+                    throw new Error(`Analysis service temporarily unavailable. Please try again in a moment.`);
+                }
                 throw new Error(`HTTP error! status: ${response.status} - ${errorData.error || response.statusText}`);
             }
 
@@ -200,7 +204,11 @@ export const EarningsCalendar: React.FC = () => {
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
             setAnalysisError(errorMessage);
-            setCurrentAnalysis({ symbol: event.symbol, text: `Error: ${errorMessage}` }); // Show error in display
+            // Show a more helpful message for missing estimates
+            const displayMessage = typeof event.epsEstimated !== 'number' 
+                ? `Analysis unavailable for ${event.symbol}: No earnings estimate available for analysis.`
+                : `Error: ${errorMessage}`;
+            setCurrentAnalysis({ symbol: event.symbol, text: displayMessage }); // Show error in display
             console.error(`[Analyze] Fetch error for ${event.symbol}:`, err);
         } finally {
             setAnalysisLoading(false);
@@ -217,20 +225,18 @@ export const EarningsCalendar: React.FC = () => {
                 <td className="px-2 py-2 whitespace-nowrap font-semibold text-blue-700">
                     <div className="flex items-center gap-1">
                         <span>{event.symbol}</span>
-                        {/* Show Info icon only if there is an estimate to analyze */}
-                        {typeof event.epsEstimated === 'number' && (
-                            <button 
-                                onClick={() => handleAnalyzeClick(event)}
-                                disabled={analysisLoading && currentAnalysis?.symbol === event.symbol} // Disable only if loading for this specific one
-                                className="p-0.5 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed" 
-                                title="Analyze Trend"
-                            >
-                                {isAnalysisLoadingForThis ? 
-                                    <Loader2 size={14} className="animate-spin text-blue-600" /> : 
-                                    <Info size={14} className="text-blue-600" />
-                                }
-                            </button>
-                        )}
+                        {/* Show Info icon for analysis - now available for all earnings */}
+                        <button 
+                            onClick={() => handleAnalyzeClick(event)}
+                            disabled={analysisLoading && currentAnalysis?.symbol === event.symbol} // Disable only if loading for this specific one
+                            className="p-0.5 rounded hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed" 
+                            title="Analyze Trend"
+                        >
+                            {isAnalysisLoadingForThis ? 
+                                <Loader2 size={14} className="animate-spin text-blue-600" /> : 
+                                <Info size={14} className="text-blue-600" />
+                            }
+                        </button>
                     </div>
                 </td>
                 <td className="px-2 py-2 whitespace-nowrap text-right text-gray-700">{formatEPS(event.epsEstimated)}</td>

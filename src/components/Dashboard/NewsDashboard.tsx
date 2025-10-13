@@ -15,19 +15,21 @@ import { EconomicCalendar } from '../Calendar/EconomicCalendar';
 import { EarningsCalendar } from '../Calendar/EarningsCalendar';
 import { useMarketContext } from '../../hooks/useMarketContext';
 import { MarketContextDisplay } from '../Context/MarketContextDisplay';
-
-// Assume backend URL is defined or imported
-const BACKEND_URL = 'http://localhost:3001';
+import { MarketOverviewDisplay } from '../Analysis/MarketOverviewDisplay';
+import MarketSentiment from '../Analysis/MarketSentiment';
+import { MarketRelationships } from '../Analysis/MarketRelationships';
+import { AppHeader } from '../Layout/AppHeader';
+import { BACKEND_CONFIG } from '../../services/backend/config';
 
 export const NewsDashboard: React.FC = () => {
-  const { news, loading: newsLoading, error: newsError } = useNewsScraper();
+  const { news, loading: newsLoading, error: newsError, refreshNews } = useNewsScraper();
 
   // --- State for TE Market Overview ---
   const [teMarketOverview, setTeMarketOverview] = useState<string | null>(null);
   const [isTeOverviewLoading, setIsTeOverviewLoading] = useState(false);
   const [teOverviewError, setTeOverviewError] = useState<string | null>(null);
   // --- Ref to track if overview was fetched for the current news set ---
-  const overviewFetchedForNewsRef = useRef<RawNewsArticle[] | null>(null);
+  const overviewFetchedForNewsRef = useRef<string | null>(null);
   // --- End State ---
 
   // --- Use Market Context Hook --- 
@@ -40,10 +42,32 @@ export const NewsDashboard: React.FC = () => {
 
   // --- Fetch Function for TE Market Overview ---
   const fetchTeMarketOverview = async (articlesToAnalyze: RawNewsArticle[]) => {
-    console.log('[fetchTeMarketOverview] STARTING fetch.'); // Log start
+    console.log('[fetchTeMarketOverview] STARTING fetch with', articlesToAnalyze.length, 'articles'); // Log start
     if (articlesToAnalyze.length === 0) {
+      console.log('[fetchTeMarketOverview] No articles to analyze');
       setTeMarketOverview(null);
       return;
+    }
+
+    // Debug: Log the first article structure
+    console.log('[fetchTeMarketOverview] First article structure:', {
+      hasRaw: 'raw' in articlesToAnalyze[0],
+      rawKeys: articlesToAnalyze[0].raw ? Object.keys(articlesToAnalyze[0].raw) : 'no raw',
+      topLevelKeys: Object.keys(articlesToAnalyze[0])
+    });
+
+    // Test basic connectivity first
+    try {
+      console.log('[fetchTeMarketOverview] Testing backend connectivity...');
+      const healthResponse = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/health`);
+      console.log('[fetchTeMarketOverview] Health check status:', healthResponse.status);
+      if (!healthResponse.ok) {
+        throw new Error(`Health check failed: ${healthResponse.status}`);
+      }
+      console.log('[fetchTeMarketOverview] Backend is reachable');
+    } catch (healthError) {
+      console.error('[fetchTeMarketOverview] Backend connectivity test failed:', healthError);
+      throw new Error(`Cannot connect to backend: ${healthError.message}`);
     }
     
     setIsTeOverviewLoading(true);
@@ -55,21 +79,55 @@ export const NewsDashboard: React.FC = () => {
       console.log('Requesting TE market overview for', articlesToAnalyze.length, 'articles');
       // Ensure the articles sent have the structure expected by the backend (title, url, content)
       const payload = articlesToAnalyze.map(a => ({
-          title: a.title,
-          url: a.url,
-          content: a.content // Assuming content holds the summary from useNewsScraper
+          title: a.raw?.title || a.title,
+          url: a.raw?.url || a.url,
+          content: a.raw?.content || a.content || a.summary // Use raw content, then content, then summary as fallback
       }));
       
-      const response = await fetch(`${BACKEND_URL}/api/analysis/trading-economics-overview`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ articles: payload }),
-      });
+      console.log('Making request to:', `${BACKEND_CONFIG.BASE_URL}/api/analysis/trading-economics-overview`);
+      console.log('Payload:', { articles: payload });
+
+      const makeRequest = async (retryCount = 0): Promise<Response> => {
+        try {
+          const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/analysis/trading-economics-overview`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ articles: payload }),
+            signal: AbortSignal.timeout(600000), // 10 minute timeout to match backend
+          });
+          return response;
+        } catch (error) {
+          if (retryCount < 2 && (error.name === 'TimeoutError' || error.message.includes('temporarily unavailable'))) {
+            console.log(`[fetchTeMarketOverview] Retrying request (attempt ${retryCount + 2})...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+            return makeRequest(retryCount + 1);
+          }
+          throw error;
+        }
+      };
+
+      const response = await makeRequest();
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('[fetchTeMarketOverview] API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          url: response.url
+        });
+
+        if (response.status === 504 || response.status === 503) {
+          throw new Error(`Market overview service temporarily unavailable. The analysis service is experiencing high load. Please try again in a moment.`);
+        }
+        if (response.status === 429) {
+          throw new Error(`Rate limit exceeded. The AI service is busy. Please wait 30 seconds and try again.`);
+        }
         throw new Error(`HTTP error! status: ${response.status} - ${errorData.error || response.statusText}`);
       }
 
@@ -99,27 +157,50 @@ export const NewsDashboard: React.FC = () => {
   
   // --- Trigger TE Overview Fetch --- 
   useEffect(() => {
-    console.log('[useEffect TE Overview] Running effect. Conditions:', {
-      newsLoading,
-      newsError: newsError === null,
-      newsLength: news.length > 0,
-      // Check if news object reference has changed AND we haven't fetched for it
-      needsFetch: news !== overviewFetchedForNewsRef.current
-    });
-    // Fetch overview only when news is loaded, not loading, no error, 
-    // there are articles, AND we haven't fetched for this specific news array instance yet.
-    if (!newsLoading && newsError === null && news.length > 0 && news !== overviewFetchedForNewsRef.current) {
-      console.log('[useEffect TE Overview] Conditions MET. Calling fetchTeMarketOverview.');
-      fetchTeMarketOverview(news);
-      // Mark that we have fetched for this news array instance
-      overviewFetchedForNewsRef.current = news;
+    // Only fetch overview when news is loaded, not loading, no error, and there are articles
+    if (!newsLoading && !newsError && news.length > 0) {
+      // Create a signature based on article IDs to prevent duplicate processing
+      const newsSignature = news.map(n => n.id).sort().join(',');
+      const lastSignature = overviewFetchedForNewsRef.current;
+
+      console.log('[useEffect TE Overview] Running effect. Conditions:', {
+        newsLoading,
+        newsError,
+        newsLength: news.length > 0,
+        needsFetch: newsSignature !== lastSignature,
+        newsSignature: newsSignature ? newsSignature.substring(0, 50) + '...' : 'null',
+        lastSignature: lastSignature ? lastSignature.substring(0, 50) + '...' : 'null'
+      });
+
+      // Only fetch if we haven't processed this exact set of articles before
+      if (newsSignature !== lastSignature && newsSignature.length > 0) {
+        console.log('[useEffect TE Overview] Conditions MET. Calling fetchTeMarketOverview.');
+        fetchTeMarketOverview(news);
+        // Mark that we have fetched for this news signature
+        overviewFetchedForNewsRef.current = newsSignature;
+      } else {
+        console.log('[useEffect TE Overview] Skipping - already processed these articles or empty signature');
+      }
+    } else {
+      console.log('[useEffect TE Overview] Skipping - conditions not met:', {
+        newsLoading,
+        newsError,
+        newsLength: news.length
+      });
     }
-  }, [news, newsLoading, newsError]); // Keep dependencies, but add check inside
+  }, [news.length]); // Only depend on news.length to prevent infinite loops
   // --- End Trigger ---
 
   const newsForProcessor: ServiceRawNewsArticle[] = useMemo(() => {
     return news.map(article => ({
-      ...article,
+      title: article.raw?.title || article.title || 'Untitled',
+      content: article.raw?.content || article.content || article.summary || 'No content available',
+      url: article.raw?.url || article.url || '',
+      publishedAt: article.raw?.publishedAt || article.published_at,
+      created_at: article.created_at,
+      source: article.raw?.source || article.source || 'Unknown',
+      summary: article.summary,
+      sentiment: article.sentiment,
       tags: article.tags?.map(tagString => ({ label: tagString, score: 0 })) ?? undefined,
     }));
   }, [news]);
@@ -134,7 +215,7 @@ export const NewsDashboard: React.FC = () => {
     setIsGeneratingContext(true);
     setTriggerError(null);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/context/generate-now`, {
+      const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/context/generate-now`, {
         method: 'POST',
       });
       if (!response.ok || response.status !== 202) { // Check for 202 Accepted
@@ -160,17 +241,7 @@ export const NewsDashboard: React.FC = () => {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Newspaper className="w-6 h-6 text-blue-600" />
-                Market Intelligence Dashboard
-              </h1>
-              <ServiceStatus />
-            </div>
-          </div>
-        </header>
+        <AppHeader />
 
         <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
           {/* --- Overall Market Context Display --- */}
@@ -217,25 +288,68 @@ export const NewsDashboard: React.FC = () => {
             <TabsList className="mb-4">
               <TabsTrigger value="trading-economics">Trading Economics</TabsTrigger>
               <TabsTrigger value="investing11">Investing11</TabsTrigger>
+              <TabsTrigger value="market-sentiment">Market Sentiment</TabsTrigger>
+              <TabsTrigger value="market-relationships">Market Relationships</TabsTrigger>
             </TabsList>
 
             <TabsContent value="trading-economics">
-              <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-md">
-                <h3 className="text-lg font-semibold text-green-800 mb-2">Trading Economics - Market Overview</h3>
-                {isTeOverviewLoading ? (
-                  <div className="flex items-center text-green-700">
-                     <Loader2 className="animate-spin mr-2" size={16} />
-                     <span>Generating overview...</span>
-                  </div>
-                ) : teOverviewError ? (
-                  <p className="text-red-600">Error generating overview: {teOverviewError}</p>
-                ) : teMarketOverview ? (
-                  <p className="text-green-900 whitespace-pre-wrap">{teMarketOverview}</p>
-                ) : newsLoading ? (
-                   <p className="text-gray-500 italic">Loading news before generating overview...</p>
-                ) : (
-                  <p className="text-gray-500 italic">Market overview will be generated based on key articles.</p>
-                )}
+              <MarketOverviewDisplay
+                overview={teMarketOverview}
+                isLoading={isTeOverviewLoading}
+                error={teOverviewError}
+                isNewsLoading={newsLoading}
+              />
+
+              {/* Debug buttons */}
+              <div className="mt-4 p-4 bg-gray-100 rounded-lg space-y-3">
+                <div>
+                  <button
+                    onClick={() => {
+                      console.log('Manual trigger clicked');
+                      console.log('Current news state:', { loading: newsLoading, error: newsError, count: news.length });
+                      if (news.length > 0) {
+                        fetchTeMarketOverview(news);
+                      } else {
+                        console.log('No news available to analyze');
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 mr-2"
+                    disabled={newsLoading || news.length === 0}
+                  >
+                    🔧 Debug: Manual Market Overview
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        console.log('Triggering fresh scrape...');
+                        const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/schedule/trigger-te-scrape`, {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': 'Bearer 56f52b6634a410679d99bd631000ae6782a786a71e21e3f2494a36adac0d8e3f'
+                          }
+                        });
+                        const result = await response.json();
+                        console.log('Scrape trigger result:', result);
+
+                        // Wait a moment then refresh the news
+                        setTimeout(async () => {
+                          console.log('Refreshing news data...');
+                          await refreshNews(true);
+                          alert('News refreshed with fresh data!');
+                        }, 3000);
+                      } catch (error) {
+                        console.error('Failed to trigger scrape:', error);
+                        alert('Failed to trigger scrape: ' + error.message);
+                      }
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    🔄 Force Fresh Scrape & Refresh
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600">
+                  News: {news.length} articles
+                </p>
               </div>
             
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -250,7 +364,24 @@ export const NewsDashboard: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="investing11">
-              <RealTimeNews />
+              <RealTimeNews 
+                articles={news}
+                loading={newsLoading}
+                error={newsError}
+                onRefresh={refreshNews}
+              />
+            </TabsContent>
+
+            <TabsContent value="market-sentiment">
+              <div className="mb-6">
+                <MarketSentiment />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="market-relationships">
+              <div className="mb-6">
+                <MarketRelationships />
+              </div>
             </TabsContent>
           </Tabs>
         </main>

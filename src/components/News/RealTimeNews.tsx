@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NewsCard } from './NewsCard';
 import { ProcessedArticle } from '../../services/news/types'; // Keep for NewsCard prop type
 // Import the shared InternalArticle type
 import { InternalArticle } from '../../types/news.types';
 import { Loader2, RefreshCw } from 'lucide-react';
+import { BACKEND_CONFIG } from '../../services/backend/config';
 
 // Remove the outdated manual interface
 /*
@@ -20,20 +21,30 @@ interface RealTimeArticle {
 }
 */
 
-// Point to the local backend server during development
-const BACKEND_URL = 'http://localhost:3001';
-
 // Rename the component
-export const RealTimeNews = () => {
-  // Use the shared InternalArticle type for state
-  const [articles, setArticles] = useState<InternalArticle[]>([]); 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface RealTimeNewsProps {
+  articles?: InternalArticle[];
+  loading?: boolean;
+  error?: string | null;
+  onRefresh?: () => void;
+}
+
+export const RealTimeNews = ({ 
+  articles: propArticles, 
+  loading: propLoading, 
+  error: propError, 
+  onRefresh 
+}: RealTimeNewsProps = {}) => {
+  // Use props if provided, otherwise use local state
+  const [articles, setArticles] = useState<InternalArticle[]>(propArticles || []);
+  const [loading, setLoading] = useState(propLoading ?? true);
+  const [error, setError] = useState<string | null>(propError || null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   // --- New State for Market Overview ---
   const [marketOverview, setMarketOverview] = useState<string | null>(null);
   const [isOverviewLoading, setIsOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const lastOverviewSignature = useRef<string>('');
   // --- End New State ---
 
   // --- New Function to Fetch Market Overview ---
@@ -43,13 +54,25 @@ export const RealTimeNews = () => {
       return;
     }
     
+    // Prevent multiple simultaneous overview fetches
+    if (isOverviewLoading) {
+      console.log('Market overview already loading, skipping...');
+      return;
+    }
+    
+    // Prevent fetching if we already have an overview for these articles
+    const articlesSignature = fetchedArticles.map(a => a.id).sort().join(',');
+    if (marketOverview && articlesSignature === lastOverviewSignature.current) {
+      console.log('Market overview already generated for these articles, skipping...');
+      return;
+    }
+    
     setIsOverviewLoading(true);
     setOverviewError(null);
-    setMarketOverview(null); // Clear previous overview
     
     try {
       console.log('Requesting market overview for', fetchedArticles.length, 'articles');
-      const response = await fetch(`${BACKEND_URL}/api/analysis/market-overview`, {
+      const response = await fetch(`${BACKEND_CONFIG.BASE_URL}/api/analysis/market-overview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,6 +95,9 @@ export const RealTimeNews = () => {
       setMarketOverview(data.overview || 'Overview generation returned empty.'); // Set the overview text
       console.log('Market overview debug info:', data.debug); // Log debug info from backend
       
+      // Update the signature to prevent re-fetching for the same articles
+      lastOverviewSignature.current = articlesSignature;
+      
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during overview generation';
       setOverviewError(errorMessage);
@@ -83,6 +109,7 @@ export const RealTimeNews = () => {
   // --- End New Function ---
   
   const fetchNews = async (forceRefresh = false) => {
+    console.log('RealTimeNews fetchNews called', { forceRefresh, currentArticlesCount: articles.length });
     setLoading(true);
     setError(null);
     setMarketOverview(null); // Clear overview on refresh
@@ -90,7 +117,12 @@ export const RealTimeNews = () => {
     
     try {
       setIsRefreshing(forceRefresh);
-      const response = await fetch(`${BACKEND_URL}/api/real-time-news/news${forceRefresh ? '?refresh=true' : ''}`);
+      const url = new URL(`${BACKEND_CONFIG.BASE_URL}/api/news`);
+      if (forceRefresh) {
+        url.searchParams.set('refresh', 'true');
+      }
+      url.searchParams.set('t', Date.now().toString()); // Cache bust
+      const response = await fetch(url.toString());
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -102,7 +134,12 @@ export const RealTimeNews = () => {
         throw new Error(data.error);
       }
       
-      const fetchedArticlesData = Array.isArray(data.articles) ? data.articles : [];
+      const fetchedArticlesData = Array.isArray(data) ? data : (Array.isArray(data.articles) ? data.articles : []);
+      console.log('RealTimeNews received articles:', { 
+        count: fetchedArticlesData.length, 
+        firstTitle: fetchedArticlesData[0]?.raw?.title || fetchedArticlesData[0]?.title,
+        firstPublishedAt: fetchedArticlesData[0]?.raw?.publishedAt || fetchedArticlesData[0]?.publishedAt || fetchedArticlesData[0]?.published_at
+      });
       setArticles(fetchedArticlesData); 
       
       // --- Trigger overview fetch after articles are set ---
@@ -126,14 +163,52 @@ export const RealTimeNews = () => {
     }
   };
 
+  // Update local state when props change
   useEffect(() => {
-    fetchNews();
-  }, []);
+    if (propArticles) {
+      setArticles(propArticles);
+    }
+  }, [propArticles]);
+
+  useEffect(() => {
+    if (propLoading !== undefined) {
+      setLoading(propLoading);
+    }
+  }, [propLoading]);
+
+  useEffect(() => {
+    if (propError !== undefined) {
+      setError(propError);
+    }
+  }, [propError]);
+
+  // Only fetch news if no props are provided (standalone mode)
+  useEffect(() => {
+    if (!propArticles && !propLoading && !propError) {
+      console.log('RealTimeNews useEffect triggered - fetching news (standalone mode)');
+      fetchNews();
+    }
+  }, [propArticles, propLoading, propError]);
+
+  // Fetch market overview when articles change (but only if we haven't already processed them)
+  useEffect(() => {
+    if (articles.length > 0 && !loading && !error) {
+      const articlesSignature = articles.map(a => a.id).sort().join(',');
+      if (articlesSignature !== lastOverviewSignature.current) {
+        console.log('Articles changed, fetching market overview...');
+        fetchMarketOverview(articles);
+      }
+    }
+  }, [articles.length, loading, error]); // Only depend on length, loading, and error, not the entire articles array
 
   const handleRefresh = () => {
-    // setLoading(true); // Already handled in fetchNews
-    // setError(null); 
-    fetchNews(true);
+    if (onRefresh) {
+      onRefresh();
+    } else {
+      // setLoading(true); // Already handled in fetchNews
+      // setError(null); 
+      fetchNews(true);
+    }
   };
 
   // Initial loading state for the main articles
@@ -195,12 +270,12 @@ export const RealTimeNews = () => {
             const articleForCard: ProcessedArticle = {
               id: String(article.id ?? index), // Ensure ID is string, provide fallback if undefined
               raw: {
-                title: article.title,
-                content: article.content ?? 'Content unavailable', // Handle optional content
-                url: article.url,
-                publishedAt: article.publishedAt, // Use correct camelCase name
-                source: article.sourceName, // Use correct camelCase name
-                created_at: article.createdAt // Use correct camelCase name
+                title: article.raw?.title || article.title || 'No title',
+                content: article.raw?.content || article.content || 'Content unavailable',
+                url: article.raw?.url || article.url || '#',
+                publishedAt: article.raw?.publishedAt || article.publishedAt || article.published_at,
+                source: article.raw?.source || article.sourceName || article.source || 'Unknown',
+                created_at: article.created_at || article.createdAt
               },
               // Provide default/empty values for analysis fields
               summary: '',
